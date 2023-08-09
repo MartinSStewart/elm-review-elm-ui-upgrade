@@ -6,14 +6,16 @@ module UpgradeElmUi exposing (rule)
 
 -}
 
+import Elm.Syntax.Declaration exposing (Declaration(..))
 import Elm.Syntax.Expression exposing (Expression(..))
+import Elm.Syntax.File exposing (File)
 import Elm.Syntax.Import exposing (Import)
 import Elm.Syntax.Module exposing (Module(..))
 import Elm.Syntax.ModuleName exposing (ModuleName)
 import Elm.Syntax.Node as Node exposing (Node(..))
 import Elm.Syntax.Range exposing (Range)
 import List.Extra as List
-import Review.Fix
+import Review.Fix exposing (Fix)
 import Review.ModuleNameLookupTable exposing (ModuleNameLookupTable)
 import Review.Rule as Rule exposing (Rule)
 import Set exposing (Set)
@@ -56,24 +58,23 @@ elm-review --template MartinSStewart/elm-review-elm-ui-upgrade/example --rules U
 rule : Rule
 rule =
     Rule.newModuleRuleSchemaUsingContextCreator "UpgradeElmUi" initialContext
-        |> Rule.withExpressionEnterVisitor expressionVisitor
-        |> Rule.withSimpleImportVisitor importVisitor
-        |> Rule.withSimpleModuleDefinitionVisitor moduleDefinitionVisitor
+        |> Rule.withModuleDefinitionVisitor moduleDefinitionVisitor
         |> Rule.fromModuleRuleSchema
 
 
 type alias Context =
-    { lookupTable : ModuleNameLookupTable }
+    { lookupTable : ModuleNameLookupTable, ast : File }
 
 
 initialContext : Rule.ContextCreator () Context
 initialContext =
     Rule.initContextCreator
-        (\lookupTable () -> { lookupTable = lookupTable })
+        (\lookupTable ast () -> { lookupTable = lookupTable, ast = ast })
         |> Rule.withModuleNameLookupTable
+        |> Rule.withFullAst
 
 
-importVisitor : Node Import -> List (Rule.Error {})
+importVisitor : Node Import -> List Fix
 importVisitor (Node _ import2) =
     renameModules import2.moduleName
         ++ (case import2.moduleAlias of
@@ -85,20 +86,77 @@ importVisitor (Node _ import2) =
            )
 
 
-moduleDefinitionVisitor : Node Module -> List (Rule.Error {})
-moduleDefinitionVisitor (Node _ module2) =
-    case module2 of
-        NormalModule a ->
-            renameModules a.moduleName
+moduleDefinitionVisitor : Node Module -> Context -> ( List (Rule.Error {}), Context )
+moduleDefinitionVisitor (Node range _) context =
+    let
+        importFixes : List Fix
+        importFixes =
+            List.concatMap
+                (\import2 ->
+                    importVisitor import2
+                )
+                context.ast.imports
 
-        PortModule a ->
-            renameModules a.moduleName
+        declarationFixes =
+            List.concatMap
+                (\declaration ->
+                    topLevelDeclarationVisitor context.lookupTable declaration
+                )
+                context.ast.declarations
+    in
+    ( case importFixes of
+        [] ->
+            []
 
-        EffectModule a ->
-            renameModules a.moduleName
+        _ ->
+            Rule.errorWithFix
+                { message = "Module needs upgrading"
+                , details = []
+                }
+                range
+                (importFixes ++ declarationFixes)
+    , context
+    )
 
 
-renameModules : Node ModuleName -> List (Rule.Error {})
+topLevelDeclarationVisitor : ModuleNameLookupTable -> Declaration -> List Fix
+topLevelDeclarationVisitor lookupTable declaration =
+    case declaration of
+        FunctionDeclaration function ->
+            []
+
+        AliasDeclaration typeAlias ->
+            []
+
+        CustomTypeDeclaration type2 ->
+            List.map (\contructor -> contructor) type2.constructors
+
+        PortDeclaration _ ->
+            []
+
+        InfixDeclaration _ ->
+            []
+
+        Destructuring _ _ ->
+            []
+
+
+
+--type alias ValueConstructor =
+--    { name : Node String
+--    , arguments : List (Node TypeAnnotation)
+--    }
+--type TypeAnnotation
+--    = GenericType String
+--    | Typed (Node ( ModuleName, String )) (List (Node TypeAnnotation))
+--    | Unit
+--    | Tupled (List (Node TypeAnnotation))
+--    | Record RecordDefinition
+--    | GenericRecord (Node String) (Node RecordDefinition)
+--    | FunctionTypeAnnotation (Node TypeAnnotation) (Node TypeAnnotation)
+
+
+renameModules : Node ModuleName -> List Fix
 renameModules (Node range moduleName) =
     case moduleName of
         --[ "Ui" ] ->
@@ -110,45 +168,39 @@ renameModules (Node range moduleName) =
         --        [ Review.Fix.replaceRangeBy range "MyUi" ]
         --    ]
         [ "Element" ] ->
-            fixError range "Ui"
+            [ replaceModuleName range "Ui" ]
 
         [ "Element", "Background" ] ->
-            fixError range "Ui.Background"
+            [ replaceModuleName range "Ui.Background" ]
 
         [ "Element", "Border" ] ->
-            fixError range "Ui.Border"
+            [ replaceModuleName range "Ui.Border" ]
 
         [ "Element", "Events" ] ->
-            fixError range "Ui.Events"
+            [ replaceModuleName range "Ui.Events" ]
 
         [ "Element", "Font" ] ->
-            fixError range "Ui.Font"
+            [ replaceModuleName range "Ui.Font" ]
 
         [ "Element", "Input" ] ->
-            fixError range "Ui.Input"
+            [ replaceModuleName range "Ui.Input" ]
 
         [ "Element", "Keyed" ] ->
-            fixError range "Ui.Keyed"
+            [ replaceModuleName range "Ui.Keyed" ]
 
         [ "Element", "Lazy" ] ->
-            fixError range "Ui.Lazy"
+            [ replaceModuleName range "Ui.Lazy" ]
 
         [ "Element", "Region" ] ->
-            fixError range "Ui.Region"
+            [ replaceModuleName range "Ui.Region" ]
 
         _ ->
             []
 
 
-fixError : Range -> String -> List (Rule.Error {})
-fixError range newModuleName =
-    [ Rule.errorWithFix
-        { message = "This module name is called " ++ newModuleName ++ " now"
-        , details = []
-        }
-        range
-        [ Review.Fix.replaceRangeBy range newModuleName ]
-    ]
+replaceModuleName : Range -> String -> Fix
+replaceModuleName range newModuleName =
+    Review.Fix.replaceRangeBy range newModuleName
 
 
 expressionVisitor : Node Expression -> Context -> ( List (Rule.Error {}), Context )

@@ -8,24 +8,39 @@ import UpgradeElmUi exposing (rule)
 all : Test
 all =
     describe "UpgradeElmUi"
-        [ test "should not report an error when REPLACEME" <|
+        [ test "Remove width fill" <|
             \() ->
                 """module A exposing (..)
-a = 1
+
+import Ui
+
+a = 
+    Ui.row
+        [ Ui.spacing 24, Ui.width Ui.fill ]
+        []
 """
-                    |> Review.Test.run rule
-                    |> Review.Test.expectNoErrors
-        , test "should report an error when REPLACEME" <|
-            \() ->
-                """module A exposing (..)
-a = 1
-"""
+                    |> String.filter (\char -> char /= '\u{000D}')
                     |> Review.Test.run rule
                     |> Review.Test.expectErrors
                         [ Review.Test.error
                             { message = "REPLACEME"
-                            , details = [ "REPLACEME" ]
+                            , details = []
                             , under = "REPLACEME"
                             }
                         ]
+
+        --        , test "should report an error when REPLACEME" <|
+        --            \() ->
+        --                """module A exposing (..)
+        --a = 1
+        --"""
+        --                    |> String.filter (\char -> char /= '\u{000D}')
+        --                    |> Review.Test.run rule
+        --                    |> Review.Test.expectErrors
+        --                        [ Review.Test.error
+        --                            { message = "REPLACEME"
+        --                            , details = [ "REPLACEME" ]
+        --                            , under = "REPLACEME"
+        --                            }
+        --                        ]
         ]
