@@ -1,8 +1,8 @@
 module UpgradeElmUiTest exposing (all)
 
-import UpgradeElmUi exposing (rule)
 import Review.Test
 import Test exposing (Test, describe, test)
+import UpgradeElmUi exposing (rule)
 
 
 all : Test
