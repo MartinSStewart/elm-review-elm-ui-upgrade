@@ -11,8 +11,8 @@ when inside the directory containing this file.
 
 -}
 
-import UpgradeElmUi
 import Review.Rule exposing (Rule)
+import UpgradeElmUi
 
 
 config : List Rule
