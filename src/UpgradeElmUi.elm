@@ -14,6 +14,7 @@ import Elm.Syntax.Module exposing (Module(..))
 import Elm.Syntax.ModuleName exposing (ModuleName)
 import Elm.Syntax.Node as Node exposing (Node(..))
 import Elm.Syntax.Range exposing (Range)
+import Elm.Syntax.TypeAnnotation exposing (TypeAnnotation(..))
 import List.Extra as List
 import Review.Fix exposing (Fix)
 import Review.ModuleNameLookupTable exposing (ModuleNameLookupTable)
@@ -129,7 +130,13 @@ topLevelDeclarationVisitor lookupTable declaration =
             []
 
         CustomTypeDeclaration type2 ->
-            List.map (\contructor -> contructor) type2.constructors
+            List.concatMap
+                (\(Node _ constructor) ->
+                    List.concatMap
+                        valueConstructorArgumentVisitor
+                        constructor.arguments
+                )
+                type2.constructors
 
         PortDeclaration _ ->
             []
@@ -139,6 +146,31 @@ topLevelDeclarationVisitor lookupTable declaration =
 
         Destructuring _ _ ->
             []
+
+
+valueConstructorArgumentVisitor : Node TypeAnnotation -> List Fix
+valueConstructorArgumentVisitor (Node _ typeAnnotation) =
+    case typeAnnotation of
+        GenericType _ ->
+            []
+
+        Typed node nodes ->
+            0
+
+        Unit ->
+            []
+
+        Tupled nodes ->
+            0
+
+        Record recordDefinition ->
+            0
+
+        GenericRecord _ node2 ->
+            0
+
+        FunctionTypeAnnotation node1 node2 ->
+            0
 
 
 
