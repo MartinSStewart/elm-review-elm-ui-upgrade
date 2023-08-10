@@ -12,21 +12,33 @@ all =
             \() ->
                 """module A exposing (..)
 
-import Ui
+import Element
 
 a = 
-    Ui.row
-        [ Ui.spacing 24, Ui.width Ui.fill ]
+    Element.row
+        [ Element.spacing 24, Element.width Element.fill ]
         []
 """
                     |> String.filter (\char -> char /= '\u{000D}')
                     |> Review.Test.run rule
                     |> Review.Test.expectErrors
                         [ Review.Test.error
-                            { message = "REPLACEME"
-                            , details = []
-                            , under = "REPLACEME"
+                            { message = "Module needs upgrading"
+                            , details = [ "In order to upgrade to elm-ui 2, changes need to be made to this module." ]
+                            , under = "module A exposing (..)"
                             }
+                            |> Review.Test.whenFixed
+                                (String.filter (\char -> char /= '\u{000D}')
+                                    """module A exposing (..)
+
+import Ui
+
+a = 
+    Element.row
+        [ Element.spacing 24, Element.width Element.fill ]
+        []
+"""
+                                )
                         ]
 
         --        , test "should report an error when REPLACEME" <|

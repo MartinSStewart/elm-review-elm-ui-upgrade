@@ -60,6 +60,7 @@ rule : Rule
 rule =
     Rule.newModuleRuleSchemaUsingContextCreator "UpgradeElmUi" initialContext
         |> Rule.withModuleDefinitionVisitor moduleDefinitionVisitor
+        |> Rule.providesFixesForModuleRule
         |> Rule.fromModuleRuleSchema
 
 
@@ -77,10 +78,10 @@ initialContext =
 
 importVisitor : Node Import -> List Fix
 importVisitor (Node _ import2) =
-    renameModules import2.moduleName
+    renameModules2 import2.moduleName
         ++ (case import2.moduleAlias of
                 Just alias ->
-                    renameModules alias
+                    renameModules2 alias
 
                 Nothing ->
                     []
@@ -92,12 +93,9 @@ moduleDefinitionVisitor (Node range _) context =
     let
         importFixes : List Fix
         importFixes =
-            List.concatMap
-                (\import2 ->
-                    importVisitor import2
-                )
-                context.ast.imports
+            List.concatMap importVisitor context.ast.imports
 
+        declarationFixes : List Fix
         declarationFixes =
             List.concatMap
                 (\declaration ->
@@ -105,35 +103,36 @@ moduleDefinitionVisitor (Node range _) context =
                 )
                 context.ast.declarations
     in
-    ( case importFixes of
+    ( case importFixes ++ declarationFixes of
         [] ->
             []
 
         _ ->
-            Rule.errorWithFix
+            [ Rule.errorWithFix
                 { message = "Module needs upgrading"
-                , details = []
+                , details = [ "In order to upgrade to elm-ui 2, changes need to be made to this module." ]
                 }
                 range
                 (importFixes ++ declarationFixes)
+            ]
     , context
     )
 
 
-topLevelDeclarationVisitor : ModuleNameLookupTable -> Declaration -> List Fix
+topLevelDeclarationVisitor : ModuleNameLookupTable -> Node Declaration -> List Fix
 topLevelDeclarationVisitor lookupTable declaration =
-    case declaration of
+    case Node.value declaration of
         FunctionDeclaration function ->
             []
 
         AliasDeclaration typeAlias ->
-            []
+            typeAnnotationVisitor lookupTable typeAlias.typeAnnotation
 
         CustomTypeDeclaration type2 ->
             List.concatMap
                 (\(Node _ constructor) ->
                     List.concatMap
-                        valueConstructorArgumentVisitor
+                        (typeAnnotationVisitor lookupTable)
                         constructor.arguments
                 )
                 type2.constructors
@@ -148,57 +147,49 @@ topLevelDeclarationVisitor lookupTable declaration =
             []
 
 
-valueConstructorArgumentVisitor : Node TypeAnnotation -> List Fix
-valueConstructorArgumentVisitor (Node _ typeAnnotation) =
+typeAnnotationVisitor : ModuleNameLookupTable -> Node TypeAnnotation -> List Fix
+typeAnnotationVisitor lookupTable (Node _ typeAnnotation) =
     case typeAnnotation of
         GenericType _ ->
             []
 
         Typed node nodes ->
-            0
+            renameModules lookupTable (Node.map Tuple.first node)
+                ++ List.concatMap (typeAnnotationVisitor lookupTable) nodes
 
         Unit ->
             []
 
         Tupled nodes ->
-            0
+            List.concatMap (typeAnnotationVisitor lookupTable) nodes
 
-        Record recordDefinition ->
-            0
+        Record fields ->
+            List.concatMap
+                (\(Node _ ( _, typeAnnotation2 )) -> typeAnnotationVisitor lookupTable typeAnnotation2)
+                fields
 
-        GenericRecord _ node2 ->
-            0
+        GenericRecord _ (Node _ fields) ->
+            List.concatMap
+                (\(Node _ ( _, typeAnnotation2 )) -> typeAnnotationVisitor lookupTable typeAnnotation2)
+                fields
 
         FunctionTypeAnnotation node1 node2 ->
-            0
+            typeAnnotationVisitor lookupTable node1 ++ typeAnnotationVisitor lookupTable node2
 
 
+renameModules : ModuleNameLookupTable -> Node ModuleName -> List Fix
+renameModules lookupTable (Node range _) =
+    case Review.ModuleNameLookupTable.moduleNameAt lookupTable range of
+        Just realModuleName ->
+            renameModules2 (Node range realModuleName)
 
---type alias ValueConstructor =
---    { name : Node String
---    , arguments : List (Node TypeAnnotation)
---    }
---type TypeAnnotation
---    = GenericType String
---    | Typed (Node ( ModuleName, String )) (List (Node TypeAnnotation))
---    | Unit
---    | Tupled (List (Node TypeAnnotation))
---    | Record RecordDefinition
---    | GenericRecord (Node String) (Node RecordDefinition)
---    | FunctionTypeAnnotation (Node TypeAnnotation) (Node TypeAnnotation)
+        Nothing ->
+            []
 
 
-renameModules : Node ModuleName -> List Fix
-renameModules (Node range moduleName) =
+renameModules2 : Node ModuleName -> List Fix
+renameModules2 (Node range moduleName) =
     case moduleName of
-        --[ "Ui" ] ->
-        --    [ Rule.errorWithFix
-        --        { message = "The Ui module name is used by elm-ui 2"
-        --        , details = [ "You're Ui modules will be renamed to MyUi" ]
-        --        }
-        --        range
-        --        [ Review.Fix.replaceRangeBy range "MyUi" ]
-        --    ]
         [ "Element" ] ->
             [ replaceModuleName range "Ui" ]
 
@@ -235,11 +226,12 @@ replaceModuleName range newModuleName =
     Review.Fix.replaceRangeBy range newModuleName
 
 
-expressionVisitor : Node Expression -> Context -> ( List (Rule.Error {}), Context )
+expressionVisitor : Node Expression -> Context -> ( List Fix, Context )
 expressionVisitor (Node range node) context =
     case node of
         FunctionOrValue moduleName _ ->
             ( renameModules
+                context.lookupTable
                 (Node
                     { start = range.start
                     , end =
@@ -259,12 +251,7 @@ expressionVisitor (Node range node) context =
             then
                 case List.filter (isWidthFill context.lookupTable) list of
                     [] ->
-                        ( [ Rule.errorWithFix
-                                { message = "The default is no longer Element.width Element.shrink"
-                                , details = []
-                                }
-                                param1Range
-                                [ Review.Fix.insertAt param1Range.start "Ui.width Ui.shrink" ]
+                        ( [ Review.Fix.insertAt param1Range.start "Ui.width Ui.shrink"
                           ]
                         , context
                         )
@@ -272,12 +259,7 @@ expressionVisitor (Node range node) context =
                     widthFills ->
                         ( List.map
                             (\(Node widthFillRange _) ->
-                                Rule.errorWithFix
-                                    { message = "The default is no longer Element.width Element.shrink"
-                                    , details = []
-                                    }
-                                    param1Range
-                                    [ Review.Fix.removeRange widthFillRange ]
+                                Review.Fix.removeRange widthFillRange
                             )
                             widthFills
                         , context
