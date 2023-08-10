@@ -49,6 +49,7 @@ a =
         ]
 
 
+ruleTest : String -> String -> String -> Test
 ruleTest name input output =
     test name <|
         \() ->

@@ -10,52 +10,19 @@ import Elm.Syntax.Declaration exposing (Declaration(..))
 import Elm.Syntax.Expression exposing (Expression(..), Function, LetDeclaration(..))
 import Elm.Syntax.File exposing (File)
 import Elm.Syntax.Import exposing (Import)
-import Elm.Syntax.Module exposing (Module(..))
+import Elm.Syntax.Module exposing (Module)
 import Elm.Syntax.ModuleName exposing (ModuleName)
 import Elm.Syntax.Node as Node exposing (Node(..))
 import Elm.Syntax.Pattern exposing (Pattern(..))
-import Elm.Syntax.Range exposing (Range)
+import Elm.Syntax.Range exposing (Location, Range)
 import Elm.Syntax.TypeAnnotation exposing (TypeAnnotation(..))
-import List.Extra as List
 import Review.Fix exposing (Fix)
 import Review.ModuleNameLookupTable exposing (ModuleNameLookupTable)
 import Review.Rule as Rule exposing (Rule)
 import Set exposing (Set)
 
 
-{-| Reports... REPLACEME
-
-    config =
-        [ UpgradeElmUi.rule
-        ]
-
-
-## Fail
-
-    a =
-        "REPLACEME example to replace"
-
-
-## Success
-
-    a =
-        "REPLACEME example to replace"
-
-
-## When (not) to enable this rule
-
-This rule is useful when REPLACEME.
-This rule is not useful when REPLACEME.
-
-
-## Try it out
-
-You can try this rule out by running the following command:
-
-```bash
-elm-review --template MartinSStewart/elm-review-elm-ui-upgrade/example --rules UpgradeElmUi
-```
-
+{-| Upgrades your elm-ui dependency from elm-ui to elm-ui 2.
 -}
 rule : Rule
 rule =
@@ -129,19 +96,19 @@ patternVisitor lookupTable (Node range pattern) =
         UnitPattern ->
             []
 
-        CharPattern char ->
+        CharPattern _ ->
             []
 
-        StringPattern string ->
+        StringPattern _ ->
             []
 
-        IntPattern int ->
+        IntPattern _ ->
             []
 
-        HexPattern int ->
+        HexPattern _ ->
             []
 
-        FloatPattern float ->
+        FloatPattern _ ->
             []
 
         TuplePattern nodes ->
@@ -156,7 +123,7 @@ patternVisitor lookupTable (Node range pattern) =
         ListPattern nodes ->
             List.concatMap (patternVisitor lookupTable) nodes
 
-        VarPattern string ->
+        VarPattern _ ->
             []
 
         NamedPattern { moduleName } nodes ->
@@ -308,6 +275,7 @@ replaceModuleName range newModuleName =
     Review.Fix.replaceRangeBy range newModuleName
 
 
+renameModules3 : ModuleNameLookupTable -> Range -> List String -> List Fix
 renameModules3 lookupTable range moduleName =
     renameModules
         lookupTable
@@ -336,6 +304,7 @@ expressionVisitor lookupTable (Node range expr) =
                             && Set.member function hasAttributeListParam
                     then
                         let
+                            insideListStart : Location
                             insideListStart =
                                 { column = param1Range.start.column + 1, row = param1Range.start.row }
                         in
@@ -358,7 +327,7 @@ expressionVisitor lookupTable (Node range expr) =
                                 |> .fixes
 
                         else
-                            [ " Ui.width Ui.shrink"
+                            (" Ui.width Ui.shrink"
                                 ++ (if List.isEmpty list then
                                         ""
 
@@ -366,8 +335,8 @@ expressionVisitor lookupTable (Node range expr) =
                                         ","
                                    )
                                 |> Review.Fix.insertAt insideListStart
-                            ]
-                                ++ List.concatMap (expressionVisitor lookupTable) list
+                            )
+                                :: List.concatMap (expressionVisitor lookupTable) list
 
                     else
                         []
@@ -387,28 +356,28 @@ expressionVisitor lookupTable (Node range expr) =
                 ++ expressionVisitor lookupTable ifTrue
                 ++ expressionVisitor lookupTable ifFalse
 
-        PrefixOperator string ->
+        PrefixOperator _ ->
             []
 
-        Operator string ->
+        Operator _ ->
             []
 
-        Integer int ->
+        Integer _ ->
             []
 
-        Hex int ->
+        Hex _ ->
             []
 
-        Floatable float ->
+        Floatable _ ->
             []
 
         Negation node ->
             expressionVisitor lookupTable node
 
-        Literal string ->
+        Literal _ ->
             []
 
-        CharLiteral char ->
+        CharLiteral _ ->
             []
 
         TupledExpression nodes ->
@@ -452,13 +421,13 @@ expressionVisitor lookupTable (Node range expr) =
         RecordAccess node _ ->
             expressionVisitor lookupTable node
 
-        RecordAccessFunction string ->
+        RecordAccessFunction _ ->
             []
 
         RecordUpdateExpression _ nodes ->
             List.concatMap (\(Node _ ( _, field )) -> expressionVisitor lookupTable field) nodes
 
-        GLSLExpression string ->
+        GLSLExpression _ ->
             []
 
 
