@@ -8,7 +8,7 @@ module UpgradeElmUi exposing (rule)
 
 import Elm.Constraint
 import Elm.Package
-import Elm.Project exposing (ApplicationInfo, PackageInfo, Project)
+import Elm.Project exposing (ApplicationInfo, PackageInfo)
 import Elm.Syntax.Declaration exposing (Declaration(..))
 import Elm.Syntax.Expression exposing (Expression(..), Function, LetDeclaration(..))
 import Elm.Syntax.File exposing (File)
@@ -82,15 +82,6 @@ constraintV2 =
 version2 : Elm.Version.Version
 version2 =
     Unsafe.version ( 2, 0, 0 )
-
-
-dependenciesV1 : List ( Elm.Package.Name, Elm.Constraint.Constraint )
-dependenciesV1 =
-    [ ( Unsafe.packageName "elm/core", Unsafe.constraint "1.0.0 <= v < 2.0.0" )
-    , ( Unsafe.packageName "elm/html", Unsafe.constraint "1.0.0 <= v < 2.0.0" )
-    , ( Unsafe.packageName "elm/json", Unsafe.constraint "1.0.0 <= v < 2.0.0" )
-    , ( Unsafe.packageName "elm/virtual-dom", Unsafe.constraint "1.0.0 <= v < 2.0.0" )
-    ]
 
 
 dependenciesV2 : List ( Elm.Package.Name, Elm.Constraint.Constraint )

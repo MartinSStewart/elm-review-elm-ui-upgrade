@@ -1,7 +1,6 @@
 module UpgradeElmUiTest exposing (all)
 
 import Elm.Project
-import Json.Decode
 import Json.Encode
 import Review.Project
 import Review.Test
