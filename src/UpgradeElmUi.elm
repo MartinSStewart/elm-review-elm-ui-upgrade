@@ -7,12 +7,13 @@ module UpgradeElmUi exposing (rule)
 -}
 
 import Elm.Syntax.Declaration exposing (Declaration(..))
-import Elm.Syntax.Expression exposing (Expression(..))
+import Elm.Syntax.Expression exposing (Expression(..), Function, LetDeclaration(..))
 import Elm.Syntax.File exposing (File)
 import Elm.Syntax.Import exposing (Import)
 import Elm.Syntax.Module exposing (Module(..))
 import Elm.Syntax.ModuleName exposing (ModuleName)
 import Elm.Syntax.Node as Node exposing (Node(..))
+import Elm.Syntax.Pattern exposing (Pattern(..))
 import Elm.Syntax.Range exposing (Range)
 import Elm.Syntax.TypeAnnotation exposing (TypeAnnotation(..))
 import List.Extra as List
@@ -119,11 +120,92 @@ moduleDefinitionVisitor (Node range _) context =
     )
 
 
+patternVisitor : ModuleNameLookupTable -> Node Pattern -> List Fix
+patternVisitor lookupTable (Node range pattern) =
+    case pattern of
+        AllPattern ->
+            []
+
+        UnitPattern ->
+            []
+
+        CharPattern char ->
+            []
+
+        StringPattern string ->
+            []
+
+        IntPattern int ->
+            []
+
+        HexPattern int ->
+            []
+
+        FloatPattern float ->
+            []
+
+        TuplePattern nodes ->
+            List.concatMap (patternVisitor lookupTable) nodes
+
+        RecordPattern _ ->
+            []
+
+        UnConsPattern node nodes ->
+            patternVisitor lookupTable node ++ patternVisitor lookupTable nodes
+
+        ListPattern nodes ->
+            List.concatMap (patternVisitor lookupTable) nodes
+
+        VarPattern string ->
+            []
+
+        NamedPattern { moduleName } nodes ->
+            renameModules
+                lookupTable
+                (Node
+                    { start = range.start
+                    , end =
+                        { column = range.start.column + String.length (String.join "." moduleName)
+                        , row = range.start.row
+                        }
+                    }
+                    moduleName
+                )
+                ++ List.concatMap (patternVisitor lookupTable) nodes
+
+        AsPattern node _ ->
+            patternVisitor lookupTable node
+
+        ParenthesizedPattern node ->
+            patternVisitor lookupTable node
+
+
+functionVisitor : ModuleNameLookupTable -> Function -> List Fix
+functionVisitor lookupTable function =
+    (case function.signature of
+        Just (Node _ signature) ->
+            typeAnnotationVisitor lookupTable signature.typeAnnotation
+
+        _ ->
+            []
+    )
+        ++ (function.declaration
+                |> Node.value
+                |> .arguments
+                |> List.concatMap (patternVisitor lookupTable)
+           )
+        ++ (function.declaration
+                |> Node.value
+                |> .expression
+                |> expressionVisitor lookupTable
+           )
+
+
 topLevelDeclarationVisitor : ModuleNameLookupTable -> Node Declaration -> List Fix
 topLevelDeclarationVisitor lookupTable declaration =
     case Node.value declaration of
         FunctionDeclaration function ->
-            []
+            functionVisitor lookupTable function
 
         AliasDeclaration typeAlias ->
             typeAnnotationVisitor lookupTable typeAlias.typeAnnotation
@@ -226,50 +308,158 @@ replaceModuleName range newModuleName =
     Review.Fix.replaceRangeBy range newModuleName
 
 
-expressionVisitor : Node Expression -> Context -> ( List Fix, Context )
-expressionVisitor (Node range node) context =
-    case node of
+renameModules3 lookupTable range moduleName =
+    renameModules
+        lookupTable
+        (Node
+            { start = range.start
+            , end =
+                { column = range.start.column + String.length (String.join "." moduleName)
+                , row = range.start.row
+                }
+            }
+            moduleName
+        )
+
+
+expressionVisitor : ModuleNameLookupTable -> Node Expression -> List Fix
+expressionVisitor lookupTable (Node range expr) =
+    case expr of
         FunctionOrValue moduleName _ ->
-            ( renameModules
-                context.lookupTable
-                (Node
-                    { start = range.start
-                    , end =
-                        { column = range.start.column + String.length (String.join "." moduleName)
-                        , row = range.start.row
-                        }
-                    }
-                    moduleName
-                )
-            , context
-            )
+            renameModules3 lookupTable range moduleName
 
-        Application ((Node range2 (FunctionOrValue _ function)) :: (Node param1Range (ListExpr list)) :: _) ->
-            if
-                (Review.ModuleNameLookupTable.moduleNameAt context.lookupTable range2 == Just [ "Element" ])
-                    && Set.member function hasAttributeListParam
-            then
-                case List.filter (isWidthFill context.lookupTable) list of
-                    [] ->
-                        ( [ Review.Fix.insertAt param1Range.start "Ui.width Ui.shrink"
-                          ]
-                        , context
-                        )
+        Application ((Node range2 (FunctionOrValue moduleName function)) :: (Node param1Range (ListExpr list)) :: rest) ->
+            renameModules3 lookupTable range2 moduleName
+                ++ List.concatMap (expressionVisitor lookupTable) rest
+                ++ (if
+                        (Review.ModuleNameLookupTable.moduleNameAt lookupTable range2 == Just [ "Element" ])
+                            && Set.member function hasAttributeListParam
+                    then
+                        let
+                            insideListStart =
+                                { column = param1Range.start.column + 1, row = param1Range.start.row }
+                        in
+                        if List.any (isWidthFill lookupTable) list then
+                            List.foldl
+                                (\item { endOfPrevious, fixes } ->
+                                    { fixes =
+                                        if isWidthFill lookupTable item then
+                                            Review.Fix.removeRange
+                                                { start = endOfPrevious, end = Node.range item |> .end }
+                                                :: fixes
 
-                    widthFills ->
-                        ( List.map
-                            (\(Node widthFillRange _) ->
-                                Review.Fix.removeRange widthFillRange
-                            )
-                            widthFills
-                        , context
-                        )
+                                        else
+                                            expressionVisitor lookupTable item ++ fixes
+                                    , endOfPrevious = Node.range item |> .end
+                                    }
+                                )
+                                { endOfPrevious = insideListStart, fixes = [] }
+                                list
+                                |> .fixes
 
-            else
-                ( [], context )
+                        else
+                            [ " Ui.width Ui.shrink"
+                                ++ (if List.isEmpty list then
+                                        ""
 
-        _ ->
-            ( [], context )
+                                    else
+                                        ","
+                                   )
+                                |> Review.Fix.insertAt insideListStart
+                            ]
+                                ++ List.concatMap (expressionVisitor lookupTable) list
+
+                    else
+                        []
+                   )
+
+        Application list ->
+            List.concatMap (expressionVisitor lookupTable) list
+
+        UnitExpr ->
+            []
+
+        OperatorApplication _ _ left right ->
+            expressionVisitor lookupTable left ++ expressionVisitor lookupTable right
+
+        IfBlock condition ifTrue ifFalse ->
+            expressionVisitor lookupTable condition
+                ++ expressionVisitor lookupTable ifTrue
+                ++ expressionVisitor lookupTable ifFalse
+
+        PrefixOperator string ->
+            []
+
+        Operator string ->
+            []
+
+        Integer int ->
+            []
+
+        Hex int ->
+            []
+
+        Floatable float ->
+            []
+
+        Negation node ->
+            expressionVisitor lookupTable node
+
+        Literal string ->
+            []
+
+        CharLiteral char ->
+            []
+
+        TupledExpression nodes ->
+            List.concatMap (expressionVisitor lookupTable) nodes
+
+        ParenthesizedExpression node ->
+            expressionVisitor lookupTable node
+
+        LetExpression letBlock ->
+            expressionVisitor lookupTable letBlock.expression
+                ++ List.concatMap
+                    (\(Node _ letDeclaration) ->
+                        case letDeclaration of
+                            LetFunction function ->
+                                functionVisitor lookupTable function
+
+                            LetDestructuring pattern expression ->
+                                patternVisitor lookupTable pattern ++ expressionVisitor lookupTable expression
+                    )
+                    letBlock.declarations
+
+        CaseExpression caseBlock ->
+            expressionVisitor lookupTable caseBlock.expression
+                ++ List.concatMap
+                    (\( pattern, expression ) ->
+                        patternVisitor lookupTable pattern
+                            ++ expressionVisitor lookupTable expression
+                    )
+                    caseBlock.cases
+
+        LambdaExpression lambda ->
+            List.concatMap (patternVisitor lookupTable) lambda.args
+                ++ expressionVisitor lookupTable lambda.expression
+
+        RecordExpr nodes ->
+            List.concatMap (\(Node _ ( _, field )) -> expressionVisitor lookupTable field) nodes
+
+        ListExpr nodes ->
+            List.concatMap (expressionVisitor lookupTable) nodes
+
+        RecordAccess node _ ->
+            expressionVisitor lookupTable node
+
+        RecordAccessFunction string ->
+            []
+
+        RecordUpdateExpression _ nodes ->
+            List.concatMap (\(Node _ ( _, field )) -> expressionVisitor lookupTable field) nodes
+
+        GLSLExpression string ->
+            []
 
 
 isWidthFill : ModuleNameLookupTable -> Node Expression -> Bool

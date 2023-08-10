@@ -8,9 +8,8 @@ import UpgradeElmUi exposing (rule)
 all : Test
 all =
     describe "UpgradeElmUi"
-        [ test "Remove width fill" <|
-            \() ->
-                """module A exposing (..)
+        [ ruleTest "Remove width fill"
+            """module A exposing (..)
 
 import Element
 
@@ -19,40 +18,48 @@ a =
         [ Element.spacing 24, Element.width Element.fill ]
         []
 """
-                    |> String.filter (\char -> char /= '\u{000D}')
-                    |> Review.Test.run rule
-                    |> Review.Test.expectErrors
-                        [ Review.Test.error
-                            { message = "Module needs upgrading"
-                            , details = [ "In order to upgrade to elm-ui 2, changes need to be made to this module." ]
-                            , under = "module A exposing (..)"
-                            }
-                            |> Review.Test.whenFixed
-                                (String.filter (\char -> char /= '\u{000D}')
-                                    """module A exposing (..)
+            """module A exposing (..)
 
 import Ui
 
 a = 
-    Element.row
-        [ Element.spacing 24, Element.width Element.fill ]
+    Ui.row
+        [ Ui.spacing 24 ]
         []
 """
-                                )
-                        ]
+        , ruleTest "Add width shrink"
+            """module A exposing (..)
 
-        --        , test "should report an error when REPLACEME" <|
-        --            \() ->
-        --                """module A exposing (..)
-        --a = 1
-        --"""
-        --                    |> String.filter (\char -> char /= '\u{000D}')
-        --                    |> Review.Test.run rule
-        --                    |> Review.Test.expectErrors
-        --                        [ Review.Test.error
-        --                            { message = "REPLACEME"
-        --                            , details = [ "REPLACEME" ]
-        --                            , under = "REPLACEME"
-        --                            }
-        --                        ]
+import Element
+
+a =
+    Element.row
+        [ Element.spacing 24 ]
+        []
+"""
+            """module A exposing (..)
+
+import Ui
+
+a =
+    Ui.row
+        [ Ui.width Ui.shrink, Ui.spacing 24 ]
+        []
+"""
         ]
+
+
+ruleTest name input output =
+    test name <|
+        \() ->
+            input
+                |> String.filter (\char -> char /= '\u{000D}')
+                |> Review.Test.run rule
+                |> Review.Test.expectErrors
+                    [ Review.Test.error
+                        { message = "Module needs upgrading"
+                        , details = [ "In order to upgrade to elm-ui 2, changes need to be made to this module." ]
+                        , under = "module A exposing (..)"
+                        }
+                        |> Review.Test.whenFixed (String.filter (\char -> char /= '\u{000D}') output)
+                    ]
