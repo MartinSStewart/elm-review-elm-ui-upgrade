@@ -6,6 +6,9 @@ module UpgradeElmUi exposing (rule)
 
 -}
 
+import Elm.Constraint
+import Elm.Package
+import Elm.Project exposing (ApplicationInfo, PackageInfo, Project)
 import Elm.Syntax.Declaration exposing (Declaration(..))
 import Elm.Syntax.Expression exposing (Expression(..), Function, LetDeclaration(..))
 import Elm.Syntax.File exposing (File)
@@ -16,32 +19,386 @@ import Elm.Syntax.Node as Node exposing (Node(..))
 import Elm.Syntax.Pattern exposing (Pattern(..))
 import Elm.Syntax.Range exposing (Location, Range)
 import Elm.Syntax.TypeAnnotation exposing (TypeAnnotation(..))
+import Elm.Version
+import List.Extra as List
 import Review.Fix exposing (Fix)
 import Review.ModuleNameLookupTable exposing (ModuleNameLookupTable)
-import Review.Rule as Rule exposing (Rule)
+import Review.Rule as Rule exposing (ElmJsonKey, Rule)
 import Set exposing (Set)
+import Unsafe
 
 
 {-| Upgrades your elm-ui dependency from elm-ui to elm-ui 2.
 -}
 rule : Rule
 rule =
-    Rule.newModuleRuleSchemaUsingContextCreator "UpgradeElmUi" initialContext
-        |> Rule.withModuleDefinitionVisitor moduleDefinitionVisitor
-        |> Rule.providesFixesForModuleRule
-        |> Rule.fromModuleRuleSchema
+    Rule.newProjectRuleSchema "UpgradeElmUi" { continueWithModules = False }
+        |> Rule.withElmJsonProjectVisitor elmJsonVisitor
+        |> Rule.withModuleVisitor
+            (\schema ->
+                Rule.withModuleDefinitionVisitor moduleDefinitionVisitor schema
+                    |> Rule.providesFixesForModuleRule
+            )
+        |> Rule.withModuleContextUsingContextCreator
+            { fromProjectToModule = initialContext
+            , fromModuleToProject = initialContext2
+            , foldProjectContexts = \_ next -> next
+            }
+        |> Rule.providesFixesForProjectRule
+        |> Rule.fromProjectRuleSchema
+
+
+type alias ProjectContext =
+    { continueWithModules : Bool }
 
 
 type alias Context =
-    { lookupTable : ModuleNameLookupTable, ast : File }
+    { lookupTable : ModuleNameLookupTable, ast : File, continueWithModules : Bool }
 
 
-initialContext : Rule.ContextCreator () Context
+initialContext : Rule.ContextCreator ProjectContext Context
 initialContext =
     Rule.initContextCreator
-        (\lookupTable ast () -> { lookupTable = lookupTable, ast = ast })
+        (\lookupTable ast project ->
+            { lookupTable = lookupTable
+            , ast = ast
+            , continueWithModules = project.continueWithModules
+            }
+        )
         |> Rule.withModuleNameLookupTable
         |> Rule.withFullAst
+
+
+initialContext2 : Rule.ContextCreator Context ProjectContext
+initialContext2 =
+    Rule.initContextCreator (\moduleContext -> { continueWithModules = moduleContext.continueWithModules })
+
+
+constraintV2 : Elm.Constraint.Constraint
+constraintV2 =
+    Unsafe.constraint "2.0.0 <= v < 3.0.0"
+
+
+version2 : Elm.Version.Version
+version2 =
+    Unsafe.version ( 2, 0, 0 )
+
+
+dependenciesV1 : List ( Elm.Package.Name, Elm.Constraint.Constraint )
+dependenciesV1 =
+    [ ( Unsafe.packageName "elm/core", Unsafe.constraint "1.0.0 <= v < 2.0.0" )
+    , ( Unsafe.packageName "elm/html", Unsafe.constraint "1.0.0 <= v < 2.0.0" )
+    , ( Unsafe.packageName "elm/json", Unsafe.constraint "1.0.0 <= v < 2.0.0" )
+    , ( Unsafe.packageName "elm/virtual-dom", Unsafe.constraint "1.0.0 <= v < 2.0.0" )
+    ]
+
+
+dependenciesV2 : List ( Elm.Package.Name, Elm.Constraint.Constraint )
+dependenciesV2 =
+    [ ( Unsafe.packageName "avh4/elm-color", Unsafe.constraint "1.0.0 <= v < 2.0.0" )
+    , ( Unsafe.packageName "elm/browser", Unsafe.constraint "1.0.2 <= v < 2.0.0" )
+    , ( Unsafe.packageName "elm/core", Unsafe.constraint "1.0.0 <= v < 2.0.0" )
+    , ( Unsafe.packageName "elm/html", Unsafe.constraint "1.0.0 <= v < 2.0.0" )
+    , ( Unsafe.packageName "elm/json", Unsafe.constraint "1.0.0 <= v < 2.0.0" )
+    , ( Unsafe.packageName "elm/time", Unsafe.constraint "1.0.0 <= v < 2.0.0" )
+    , ( Unsafe.packageName "elm/virtual-dom", Unsafe.constraint "1.0.0 <= v < 2.0.0" )
+    ]
+
+
+elmUiName =
+    Unsafe.packageName "mdgriffith/elm-ui"
+
+
+getLowConstraint : Elm.Constraint.Constraint -> Elm.Version.Version
+getLowConstraint constraint =
+    case Elm.Constraint.toString constraint |> String.split " " |> List.head of
+        Just lowVersionText ->
+            case String.split "." lowVersionText |> List.filterMap String.toInt of
+                [ major, minor, patch ] ->
+                    Elm.Version.fromTuple ( major, minor, patch )
+                        |> Maybe.withDefault Elm.Version.one
+
+                _ ->
+                    Elm.Version.one
+
+        Nothing ->
+            Elm.Version.one
+
+
+type DependencyStatus
+    = DependencyFoundAndIsValid
+    | DependencyFoundButIsInvalid Elm.Version.Version
+    | DependencyNotFound
+
+
+elmJsonVisitor :
+    Maybe { elmJsonKey : ElmJsonKey, project : Elm.Project.Project }
+    -> ProjectContext
+    -> ( List (Rule.Error { useErrorForModule : () }), ProjectContext )
+elmJsonVisitor maybeProject context =
+    case maybeProject of
+        Just { elmJsonKey, project } ->
+            case project of
+                Elm.Project.Package package ->
+                    handlePackage elmJsonKey package context
+
+                Elm.Project.Application application ->
+                    handleApplication elmJsonKey application context
+
+        Nothing ->
+            ( [], { context | continueWithModules = False } )
+
+
+handlePackage : ElmJsonKey -> PackageInfo -> ProjectContext -> ( List (Rule.Error scope), ProjectContext )
+handlePackage elmJsonKey package context =
+    let
+        elmUiVersion : Maybe Int
+        elmUiVersion =
+            List.findMap
+                (\( packageName, constraint ) ->
+                    if packageName == elmUiName then
+                        Elm.Constraint.toString constraint
+                            |> String.split "."
+                            |> List.head
+                            |> Maybe.andThen String.toInt
+
+                    else
+                        Nothing
+                )
+                package.deps
+    in
+    case elmUiVersion of
+        Just 1 ->
+            ( [ Rule.errorForElmJsonWithFix
+                    elmJsonKey
+                    (\rawElmJson ->
+                        { message = "elm-ui 2 should replace elm-ui as a dependency"
+                        , details = [ "Since were upgrading to elm-ui 2, elm-ui can be removed" ]
+                        , range = elmJsonRange rawElmJson
+                        }
+                    )
+                    (\_ ->
+                        { package
+                            | deps =
+                                List.map
+                                    (\( packageName, version ) ->
+                                        if packageName == elmUiName then
+                                            ( packageName, constraintV2 )
+
+                                        else
+                                            ( packageName, version )
+                                    )
+                                    package.deps
+                        }
+                            |> Elm.Project.Package
+                            |> Just
+                    )
+              ]
+            , { context | continueWithModules = True }
+            )
+
+        Just _ ->
+            ( [ Rule.errorForElmJson
+                    elmJsonKey
+                    (\rawElmJson ->
+                        { message = "Wrong mdgriffith/elm-ui version"
+                        , details = [ "This package only upgrades from mdgriffith/elm-ui V1 to V2" ]
+                        , range = elmJsonRange rawElmJson
+                        }
+                    )
+              ]
+            , { context | continueWithModules = False }
+            )
+
+        Nothing ->
+            ( [ Rule.errorForElmJson
+                    elmJsonKey
+                    (\rawElmJson ->
+                        { message = "mdgriffith/elm-ui dependency missing"
+                        , details = [ "This package only upgrades from mdgriffith/elm-ui V1 to V2" ]
+                        , range = elmJsonRange rawElmJson
+                        }
+                    )
+              ]
+            , { context | continueWithModules = False }
+            )
+
+
+elmJsonRange : String -> Range
+elmJsonRange text =
+    { start = { column = 0, row = 1 }
+    , end =
+        { column =
+            case String.split "\n" text |> List.last of
+                Just last ->
+                    String.length last
+
+                Nothing ->
+                    0
+        , row = String.toList text |> List.count ((==) '\n') |> (+) 1
+        }
+    }
+
+
+checkDependency : ApplicationInfo -> ( Elm.Package.Name, Elm.Constraint.Constraint ) -> DependencyStatus
+checkDependency application ( name2, constraint ) =
+    case
+        List.findMap
+            (\( name, version ) ->
+                if name == name2 then
+                    Just version
+
+                else
+                    Nothing
+            )
+            (application.depsIndirect ++ application.depsDirect)
+    of
+        Just version ->
+            if Elm.Constraint.check version constraint then
+                DependencyFoundAndIsValid
+
+            else
+                DependencyFoundButIsInvalid version
+
+        Nothing ->
+            DependencyNotFound
+
+
+handleApplication : ElmJsonKey -> ApplicationInfo -> ProjectContext -> ( List (Rule.Error scope), ProjectContext )
+handleApplication elmJsonKey application context =
+    let
+        elmUiVersion : Maybe Int
+        elmUiVersion =
+            List.findMap
+                (\( packageName, constraint ) ->
+                    if Just packageName == Elm.Package.fromString "mdgriffith/elm-ui" then
+                        Elm.Version.toTuple constraint
+                            |> (\( major, _, _ ) -> major)
+                            |> Just
+
+                    else
+                        Nothing
+                )
+                application.depsDirect
+    in
+    case elmUiVersion of
+        Just 1 ->
+            let
+                a :
+                    { invalidDependencies :
+                        List
+                            { name : Elm.Package.Name
+                            , version : Elm.Version.Version
+                            , constraint : Elm.Constraint.Constraint
+                            }
+                    , missingDependencies : List ( Elm.Package.Name, Elm.Version.Version )
+                    }
+                a =
+                    List.foldl
+                        (\( name, constraint ) state ->
+                            case checkDependency application ( name, constraint ) of
+                                DependencyNotFound ->
+                                    { state
+                                        | missingDependencies =
+                                            ( name, getLowConstraint constraint ) :: state.missingDependencies
+                                    }
+
+                                DependencyFoundAndIsValid ->
+                                    state
+
+                                DependencyFoundButIsInvalid version ->
+                                    { state
+                                        | invalidDependencies =
+                                            { name = name, version = version, constraint = constraint }
+                                                :: state.invalidDependencies
+                                    }
+                        )
+                        { invalidDependencies = [], missingDependencies = [] }
+                        dependenciesV2
+            in
+            case a.invalidDependencies of
+                [] ->
+                    ( [ Rule.errorForElmJsonWithFix
+                            elmJsonKey
+                            (\rawElmJson ->
+                                { message = "elm-ui 2 should replace elm-ui as a dependency"
+                                , details = [ "Since were upgrading to elm-ui 2, elm-ui can be removed" ]
+                                , range = elmJsonRange rawElmJson
+                                }
+                            )
+                            (\_ ->
+                                { application
+                                    | depsDirect =
+                                        List.map
+                                            (\( packageName, version ) ->
+                                                if Just packageName == Elm.Package.fromString "mdgriffith/elm-ui" then
+                                                    ( packageName, version2 )
+
+                                                else
+                                                    ( packageName, version )
+                                            )
+                                            application.depsDirect
+                                    , depsIndirect =
+                                        application.depsIndirect ++ a.missingDependencies
+                                }
+                                    |> Elm.Project.Application
+                                    |> Just
+                            )
+                      ]
+                    , { context | continueWithModules = True }
+                    )
+
+                _ ->
+                    ( [ Rule.errorForElmJson
+                            elmJsonKey
+                            (\rawElmJson ->
+                                { message = "Incompatible package dependencies"
+                                , details =
+                                    [ "The following packages are required by elm-ui v2 but couldn't be installed due to them already being installed with an incompatible version"
+                                    , List.map
+                                        (\{ name, version, constraint } ->
+                                            Elm.Package.toString name
+                                                ++ " "
+                                                ++ Elm.Constraint.toString constraint
+                                                ++ " (you have "
+                                                ++ Elm.Version.toString version
+                                                ++ ")"
+                                        )
+                                        a.invalidDependencies
+                                        |> String.join "\n"
+                                    ]
+                                , range = elmJsonRange rawElmJson
+                                }
+                            )
+                      ]
+                    , { context | continueWithModules = False }
+                    )
+
+        Just _ ->
+            ( [ Rule.errorForElmJson
+                    elmJsonKey
+                    (\rawElmJson ->
+                        { message = "Wrong mdgriffith/elm-ui version"
+                        , details = [ "This package only upgrades from mdgriffith/elm-ui V1 to V2" ]
+                        , range = elmJsonRange rawElmJson
+                        }
+                    )
+              ]
+            , { context | continueWithModules = False }
+            )
+
+        Nothing ->
+            ( [ Rule.errorForElmJson
+                    elmJsonKey
+                    (\rawElmJson ->
+                        { message = "mdgriffith/elm-ui dependency missing"
+                        , details = [ "This package only upgrades from mdgriffith/elm-ui V1 to V2" ]
+                        , range = elmJsonRange rawElmJson
+                        }
+                    )
+              ]
+            , { context | continueWithModules = False }
+            )
 
 
 importVisitor : Node Import -> List Fix
