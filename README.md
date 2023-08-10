@@ -4,10 +4,10 @@ Upgrades your elm-ui dependency from elm-ui to elm-ui 2.
 
 ## Try it out
 
-You can try the example configuration above out by running the following command:
+If you have an existing Ui.elm module, rename it to something else (`MyUi.elm` for example)
 
+After that, run the following command:
 ```bash
-elm-review --template MartinSStewart/elm-review-elm-ui-upgrade/preview --fix-all
+npx elm-review --template MartinSStewart/elm-review-elm-ui-upgrade/preview --fix-all
 ```
-
-Make sure the `--fix-all` flag is included. This rule needs to generate all fixes in a single pass in order for it to work.
+*Don't remove the `--fix-all` flag. This rule needs to generate all fixes in a single pass in order for it to work.*
