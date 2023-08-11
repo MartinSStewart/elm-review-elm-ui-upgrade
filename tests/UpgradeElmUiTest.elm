@@ -221,34 +221,33 @@ d =
 """
             """module A exposing (..)
 
-import Element exposing (Element)
+import Ui exposing (Element)
 
 a : Element msg
 a =
-    Element.column
-        [ Element.width Element.fill, Element.spacing 16 ]
-        Element.none
+    Ui.column
+        [Ui.spacing 16 ]
+        Ui.none
 
 b : Element msg
 b =
-    Element.column
-        [ Element.width Element.fill ]
-        Element.none
+    Ui.column
+        [ ]
+        Ui.none
 
 c : Element msg
 c =
-    Element.column
-        [ Element.width Element.fill
+    Ui.column
+        [
         ]
-        Element.none
+        Ui.none
 
 d : Element msg
 d =
-    Element.column
-        [ Element.width Element.fill
-        , Element.spacing 16
+    Ui.column
+        [Ui.spacing 16
         ]
-        Element.none
+        Ui.none
 """
         ]
 
