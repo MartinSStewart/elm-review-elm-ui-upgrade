@@ -180,6 +180,8 @@ import UserConfig exposing (UserConfig)
 view : UserConfig -> FrontendUser -> Element msg
 view userConfig user =
     Ui.column
+    {- Containers now width fill by default (instead of width shrink). I couldn't update that here so I recommend you review these attributes -}
+
         (MyUi.pageContentAttributes ++ [ Ui.spacing 32 ])
         [ Ui.row
             [ Ui.width Ui.shrink, Ui.spacing 16 ]

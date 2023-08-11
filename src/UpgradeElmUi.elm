@@ -711,10 +711,7 @@ expressionVisitor lookupTable (Node range expr) =
         Application ((Node range2 (FunctionOrValue moduleName function)) :: (Node param1Range (ListExpr list)) :: rest) ->
             renameModules3 lookupTable range2 moduleName function
                 ++ List.concatMap (expressionVisitor lookupTable) rest
-                ++ (if
-                        (Review.ModuleNameLookupTable.moduleNameAt lookupTable range2 == Just [ "Element" ])
-                            && Set.member function hasAttributeListParam
-                    then
+                ++ (if isLayoutElement lookupTable range2 function then
                         let
                             insideListStart : Location
                             insideListStart =
@@ -762,6 +759,19 @@ expressionVisitor lookupTable (Node range expr) =
                     else
                         List.concatMap (expressionVisitor lookupTable) list
                    )
+
+        Application ((Node range2 (FunctionOrValue moduleName function)) :: second :: rest) ->
+            (if isLayoutElement lookupTable range2 function then
+                [ Review.Fix.insertAt
+                    range2.end
+                    "\n    {- Containers now width fill by default (instead of width shrink). I couldn't update that here so I recommend you review these attributes -}\n"
+                ]
+
+             else
+                []
+            )
+                ++ renameModules3 lookupTable range2 moduleName function
+                ++ List.concatMap (expressionVisitor lookupTable) (second :: rest)
 
         Application list ->
             List.concatMap (expressionVisitor lookupTable) list
@@ -873,18 +883,26 @@ isWidthAttribute lookupTable expr =
             False
 
 
-hasAttributeListParam : Set String
+isLayoutElement lookupTable moduleNameRange function =
+    Set.member
+        ( Review.ModuleNameLookupTable.moduleNameAt lookupTable moduleNameRange |> Maybe.withDefault []
+        , function
+        )
+        hasAttributeListParam
+
+
+hasAttributeListParam : Set ( List String, String )
 hasAttributeListParam =
     Set.fromList
-        [ "el"
-        , "row"
-        , "column"
-        , "table"
-        , "paragraph"
-        , "wrappedRow"
-        , "textColumn"
-        , "indexedTable"
-        , "image"
-        , "newTabLink"
-        , "link"
+        [ ( [ "Element" ], "el" )
+        , ( [ "Element" ], "row" )
+        , ( [ "Element" ], "column" )
+        , ( [ "Element" ], "table" )
+        , ( [ "Element" ], "paragraph" )
+        , ( [ "Element" ], "wrappedRow" )
+        , ( [ "Element" ], "textColumn" )
+        , ( [ "Element" ], "indexedTable" )
+        , ( [ "Element" ], "image" )
+        , ( [ "Element" ], "newTabLink" )
+        , ( [ "Element" ], "link" )
         ]
