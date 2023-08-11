@@ -32,7 +32,7 @@ import Unsafe
 -}
 rule : Rule
 rule =
-    Rule.newProjectRuleSchema "UpgradeElmUi" { continueWithModules = False, isFirstPass = True }
+    Rule.newProjectRuleSchema "UpgradeElmUi" { continueWithModules = False }
         |> Rule.withElmJsonProjectVisitor elmJsonVisitor
         |> Rule.withModuleVisitor
             (\schema ->
@@ -49,11 +49,11 @@ rule =
 
 
 type alias ProjectContext =
-    { continueWithModules : Bool, isFirstPass : Bool }
+    { continueWithModules : Bool }
 
 
 type alias Context =
-    { lookupTable : ModuleNameLookupTable, ast : File, continueWithModules : Bool, isFirstPass : Bool }
+    { lookupTable : ModuleNameLookupTable, ast : File, continueWithModules : Bool }
 
 
 initialContext : Rule.ContextCreator ProjectContext Context
@@ -63,7 +63,6 @@ initialContext =
             { lookupTable = lookupTable
             , ast = ast
             , continueWithModules = project.continueWithModules
-            , isFirstPass = project.isFirstPass
             }
         )
         |> Rule.withModuleNameLookupTable
@@ -75,7 +74,6 @@ initialContext2 =
     Rule.initContextCreator
         (\moduleContext ->
             { continueWithModules = moduleContext.continueWithModules
-            , isFirstPass = moduleContext.isFirstPass
             }
         )
 
@@ -197,12 +195,14 @@ handlePackage elmJsonKey package context =
                             |> Just
                     )
               ]
-            , { context | continueWithModules = True, isFirstPass = False }
+            , { context | continueWithModules = True }
             )
 
+        Just 2 ->
+            ( [], { context | continueWithModules = False } )
+
         Just _ ->
-            ( if context.isFirstPass then
-                [ Rule.errorForElmJson
+            ( [ Rule.errorForElmJson
                     elmJsonKey
                     (\rawElmJson ->
                         { message = "Wrong mdgriffith/elm-ui version"
@@ -210,16 +210,12 @@ handlePackage elmJsonKey package context =
                         , range = elmJsonRange rawElmJson
                         }
                     )
-                ]
-
-              else
-                []
+              ]
             , { context | continueWithModules = False }
             )
 
         Nothing ->
-            ( if context.isFirstPass then
-                [ Rule.errorForElmJson
+            ( [ Rule.errorForElmJson
                     elmJsonKey
                     (\rawElmJson ->
                         { message = "mdgriffith/elm-ui dependency missing"
@@ -227,10 +223,7 @@ handlePackage elmJsonKey package context =
                         , range = elmJsonRange rawElmJson
                         }
                     )
-                ]
-
-              else
-                []
+              ]
             , { context | continueWithModules = False }
             )
 
@@ -356,12 +349,11 @@ handleApplication elmJsonKey application context =
                                     |> Just
                             )
                       ]
-                    , { context | continueWithModules = True, isFirstPass = False }
+                    , { context | continueWithModules = True }
                     )
 
                 _ ->
-                    ( if context.isFirstPass then
-                        [ Rule.errorForElmJson
+                    ( [ Rule.errorForElmJson
                             elmJsonKey
                             (\rawElmJson ->
                                 { message = "Incompatible package dependencies"
@@ -382,16 +374,15 @@ handleApplication elmJsonKey application context =
                                 , range = elmJsonRange rawElmJson
                                 }
                             )
-                        ]
-
-                      else
-                        []
+                      ]
                     , { context | continueWithModules = False }
                     )
 
+        Just 2 ->
+            ( [], { context | continueWithModules = False } )
+
         Just _ ->
-            ( if context.isFirstPass then
-                [ Rule.errorForElmJson
+            ( [ Rule.errorForElmJson
                     elmJsonKey
                     (\rawElmJson ->
                         { message = "Wrong mdgriffith/elm-ui version"
@@ -399,16 +390,12 @@ handleApplication elmJsonKey application context =
                         , range = elmJsonRange rawElmJson
                         }
                     )
-                ]
-
-              else
-                []
+              ]
             , { context | continueWithModules = False }
             )
 
         Nothing ->
-            ( if context.isFirstPass then
-                [ Rule.errorForElmJson
+            ( [ Rule.errorForElmJson
                     elmJsonKey
                     (\rawElmJson ->
                         { message = "mdgriffith/elm-ui dependency missing"
@@ -416,10 +403,7 @@ handleApplication elmJsonKey application context =
                         , range = elmJsonRange rawElmJson
                         }
                     )
-                ]
-
-              else
-                []
+              ]
             , { context | continueWithModules = False }
             )
 
