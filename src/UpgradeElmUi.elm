@@ -550,8 +550,18 @@ typeAnnotationVisitor lookupTable (Node _ typeAnnotation) =
         GenericType _ ->
             []
 
-        Typed node nodes ->
-            renameModules lookupTable (Node.map Tuple.first node)
+        Typed (Node range ( moduleName, _ )) nodes ->
+            renameModules
+                lookupTable
+                (Node
+                    { start = range.start
+                    , end =
+                        { column = range.start.column + String.length (String.join "." moduleName)
+                        , row = range.start.row
+                        }
+                    }
+                    moduleName
+                )
                 ++ List.concatMap (typeAnnotationVisitor lookupTable) nodes
 
         Unit ->

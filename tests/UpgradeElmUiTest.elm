@@ -109,6 +109,7 @@ all =
 
 import Element
 
+a : Element.Element
 a = 
     Element.row
         [ Element.spacing 24, Element.width Element.fill ]
@@ -118,6 +119,7 @@ a =
 
 import Ui
 
+a : Ui.Element
 a = 
     Ui.row
         [ Ui.spacing 24 ]
@@ -128,6 +130,7 @@ a =
 
 import Element
 
+a : Element.Element
 a =
     Element.row
         [ Element.spacing 24 ]
@@ -137,6 +140,7 @@ a =
 
 import Ui
 
+a : Ui.Element
 a =
     Ui.row
         [ Ui.width Ui.shrink, Ui.spacing 24 ]
