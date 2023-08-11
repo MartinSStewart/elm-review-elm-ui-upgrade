@@ -585,21 +585,24 @@ typeAnnotationVisitor lookupTable (Node _ typeAnnotation) =
 
 
 renameModules : ModuleNameLookupTable -> Node ModuleName -> List Fix
-renameModules lookupTable (Node range _) =
-    case Review.ModuleNameLookupTable.moduleNameAt lookupTable range of
-        Just realModuleName ->
-            renameModules2 (Node range realModuleName)
+renameModules lookupTable (Node range moduleName) =
+    if moduleName == [] then
+        []
 
-        Nothing ->
-            []
+    else
+        case Review.ModuleNameLookupTable.moduleNameAt lookupTable range of
+            Just realModuleName ->
+                renameModules2 (Node range realModuleName)
+
+            Nothing ->
+                []
 
 
 renameModules2 : Node ModuleName -> List Fix
 renameModules2 (Node range moduleName) =
     case moduleName of
-        [ "Ui" ] ->
-            [ replaceModuleName range "MyUi" ]
-
+        --[ "Ui" ] ->
+        --    [ replaceModuleName range "MyUi" ]
         [ "Element" ] ->
             [ replaceModuleName range "Ui" ]
 

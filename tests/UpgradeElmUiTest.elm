@@ -146,6 +146,47 @@ a =
         [ Ui.width Ui.shrink, Ui.spacing 24 ]
         []
 """
+        , ruleTest "Handle unqualified types"
+            """module A exposing (..)
+
+import Description
+import Element exposing (Element)
+import FrontendUser exposing (FrontendUser)
+import Name
+import ProfileImage
+import MyUi
+import UserConfig exposing (UserConfig)
+
+view : UserConfig -> FrontendUser -> Element msg
+view userConfig user =
+    Element.column
+        (MyUi.pageContentAttributes ++ [ Element.spacing 32 ])
+        [ Element.row
+            [ Element.spacing 16 ]
+            [ ProfileImage.image userConfig ProfileImage.defaultSize user.profileImage, MyUi.title (Name.toString user.name) ]
+        , Description.toParagraph userConfig False user.description
+        ]
+"""
+            """module A exposing (..)
+
+import Description
+import Ui exposing (Element)
+import FrontendUser exposing (FrontendUser)
+import Name
+import ProfileImage
+import MyUi
+import UserConfig exposing (UserConfig)
+
+view : UserConfig -> FrontendUser -> Element msg
+view userConfig user =
+    Ui.column
+        (MyUi.pageContentAttributes ++ [ Ui.spacing 32 ])
+        [ Ui.row
+            [ Ui.width Ui.shrink, Ui.spacing 16 ]
+            [ ProfileImage.image userConfig ProfileImage.defaultSize user.profileImage, MyUi.title (Name.toString user.name) ]
+        , Description.toParagraph userConfig False user.description
+        ]
+"""
         ]
 
 
