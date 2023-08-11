@@ -187,6 +187,69 @@ view userConfig user =
         , Description.toParagraph userConfig False user.description
         ]
 """
+        , ruleTest "Handle removing item from list"
+            """module A exposing (..)
+
+import Element exposing (Element)
+
+a : Element msg
+a =
+    Element.column
+        [ Element.width Element.fill, Element.spacing 16 ]
+        Element.none
+
+b : Element msg
+b =
+    Element.column
+        [ Element.width Element.fill ]
+        Element.none
+
+c : Element msg
+c =
+    Element.column
+        [ Element.width Element.fill
+        ]
+        Element.none
+
+d : Element msg
+d =
+    Element.column
+        [ Element.width Element.fill
+        , Element.spacing 16
+        ]
+        Element.none
+"""
+            """module A exposing (..)
+
+import Element exposing (Element)
+
+a : Element msg
+a =
+    Element.column
+        [ Element.width Element.fill, Element.spacing 16 ]
+        Element.none
+
+b : Element msg
+b =
+    Element.column
+        [ Element.width Element.fill ]
+        Element.none
+
+c : Element msg
+c =
+    Element.column
+        [ Element.width Element.fill
+        ]
+        Element.none
+
+d : Element msg
+d =
+    Element.column
+        [ Element.width Element.fill
+        , Element.spacing 16
+        ]
+        Element.none
+"""
         ]
 
 

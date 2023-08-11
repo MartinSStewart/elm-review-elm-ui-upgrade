@@ -674,19 +674,28 @@ expressionVisitor lookupTable (Node range expr) =
                         in
                         if List.any (isWidthFill lookupTable) list then
                             List.foldl
-                                (\item { endOfPrevious, fixes } ->
+                                (\item { endOfPrevious, fixes, isFirst } ->
                                     { fixes =
                                         if isWidthFill lookupTable item then
                                             Review.Fix.removeRange
-                                                { start = endOfPrevious, end = Node.range item |> .end }
+                                                { start = endOfPrevious
+                                                , end =
+                                                    case ( isFirst, List.getAt 1 list ) of
+                                                        ( True, Just (Node rangeNext _) ) ->
+                                                            rangeNext.start
+
+                                                        _ ->
+                                                            Node.range item |> .end
+                                                }
                                                 :: fixes
 
                                         else
                                             expressionVisitor lookupTable item ++ fixes
                                     , endOfPrevious = Node.range item |> .end
+                                    , isFirst = False
                                     }
                                 )
-                                { endOfPrevious = insideListStart, fixes = [] }
+                                { endOfPrevious = insideListStart, fixes = [], isFirst = True }
                                 list
                                 |> .fixes
 
