@@ -655,8 +655,8 @@ replaceModuleName range newModuleName =
     Review.Fix.replaceRangeBy range newModuleName
 
 
-renameModules3 : ModuleNameLookupTable -> Range -> List String -> List Fix
-renameModules3 lookupTable range moduleName =
+renameModules3 : ModuleNameLookupTable -> Range -> ModuleName -> String -> List Fix
+renameModules3 lookupTable range moduleName functionName =
     renameModules
         lookupTable
         (Node
@@ -668,16 +668,48 @@ renameModules3 lookupTable range moduleName =
             }
             moduleName
         )
+        ++ (case Review.ModuleNameLookupTable.moduleNameAt lookupTable range of
+                Just actualModuleName ->
+                    let
+                        start =
+                            { column = range.start.column + String.length (String.join "." moduleName) + 1
+                            , row = range.start.row
+                            }
+
+                        functionRange =
+                            { start = start
+                            , end = { column = start.column + String.length functionName, row = range.start.row }
+                            }
+                    in
+                    case actualModuleName ++ [ functionName ] of
+                        [ "Element", "moveLeft" ] ->
+                            [ Review.Fix.replaceRangeBy functionRange "left" ]
+
+                        [ "Element", "moveRight" ] ->
+                            [ Review.Fix.replaceRangeBy functionRange "right" ]
+
+                        [ "Element", "moveUp" ] ->
+                            [ Review.Fix.replaceRangeBy functionRange "up" ]
+
+                        [ "Element", "moveDown" ] ->
+                            [ Review.Fix.replaceRangeBy functionRange "down" ]
+
+                        _ ->
+                            []
+
+                Nothing ->
+                    []
+           )
 
 
 expressionVisitor : ModuleNameLookupTable -> Node Expression -> List Fix
 expressionVisitor lookupTable (Node range expr) =
     case expr of
-        FunctionOrValue moduleName _ ->
-            renameModules3 lookupTable range moduleName
+        FunctionOrValue moduleName function ->
+            renameModules3 lookupTable range moduleName function
 
         Application ((Node range2 (FunctionOrValue moduleName function)) :: (Node param1Range (ListExpr list)) :: rest) ->
-            renameModules3 lookupTable range2 moduleName
+            renameModules3 lookupTable range2 moduleName function
                 ++ List.concatMap (expressionVisitor lookupTable) rest
                 ++ (if
                         (Review.ModuleNameLookupTable.moduleNameAt lookupTable range2 == Just [ "Element" ])
@@ -688,7 +720,7 @@ expressionVisitor lookupTable (Node range expr) =
                             insideListStart =
                                 { column = param1Range.start.column + 1, row = param1Range.start.row }
                         in
-                        if List.any (isWidthFill lookupTable) list then
+                        if List.any (isWidthAttribute lookupTable) list then
                             List.foldl
                                 (\item { endOfPrevious, fixes, isFirst } ->
                                     { fixes =
@@ -728,7 +760,7 @@ expressionVisitor lookupTable (Node range expr) =
                                 :: List.concatMap (expressionVisitor lookupTable) list
 
                     else
-                        []
+                        List.concatMap (expressionVisitor lookupTable) list
                    )
 
         Application list ->
@@ -831,6 +863,16 @@ isWidthFill lookupTable expr =
             False
 
 
+isWidthAttribute : ModuleNameLookupTable -> Node Expression -> Bool
+isWidthAttribute lookupTable expr =
+    case Node.value expr of
+        Application [ Node range1 (FunctionOrValue _ "width"), _ ] ->
+            Review.ModuleNameLookupTable.moduleNameAt lookupTable range1 == Just [ "Element" ]
+
+        _ ->
+            False
+
+
 hasAttributeListParam : Set String
 hasAttributeListParam =
     Set.fromList
@@ -842,4 +884,7 @@ hasAttributeListParam =
         , "wrappedRow"
         , "textColumn"
         , "indexedTable"
+        , "image"
+        , "newTabLink"
+        , "link"
         ]

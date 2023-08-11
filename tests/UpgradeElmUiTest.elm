@@ -249,6 +249,46 @@ d =
         ]
         Ui.none
 """
+        , ruleTest "Don't add width shrink if there's a width attribute"
+            """module A exposing (..)
+
+import Element exposing (Element)
+
+a = 
+    Element.image
+        [ Element.width (Element.px 123)
+        ]
+"""
+            """module A exposing (..)
+
+import Ui exposing (Element)
+
+a = 
+    Ui.image
+        [ Ui.width (Ui.px 123)
+        ]
+"""
+        , ruleTest "Function renaming"
+            """module A exposing (..)
+
+import Element exposing (Element)
+
+a =
+    Element.image
+        [ Element.moveLeft 8
+        , Element.moveUp 5
+        ]
+"""
+            """module A exposing (..)
+
+import Ui exposing (Element)
+
+a =
+    Ui.image
+        [ Ui.width Ui.shrink, Ui.left 8
+        , Ui.up 5
+        ]
+"""
         ]
 
 
