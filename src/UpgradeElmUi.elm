@@ -597,6 +597,9 @@ renameModules lookupTable (Node range _) =
 renameModules2 : Node ModuleName -> List Fix
 renameModules2 (Node range moduleName) =
     case moduleName of
+        [ "Ui" ] ->
+            [ replaceModuleName range "MyUi" ]
+
         [ "Element" ] ->
             [ replaceModuleName range "Ui" ]
 
