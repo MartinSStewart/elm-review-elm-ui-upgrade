@@ -329,6 +329,127 @@ a =
             )
         )
 """
+        , ruleTest "MyUi"
+            """module A exposing (..)
+
+import Colors
+import Date exposing (Date)
+import Effect.Browser.Dom as Dom exposing (HtmlId)
+import Element exposing (Attr, Attribute, Element)
+import Element.Background
+import Element.Border
+import Element.Font
+import Element.Input
+import Element.Region
+import EmailAddress exposing (EmailAddress)
+import Html exposing (Html)
+import Html.Attributes
+import Html.Events
+import Json.Decode
+import List.Nonempty exposing (Nonempty)
+import Route exposing (Route)
+import Svg
+import Svg.Attributes
+import Time
+import Time.Extra as Time
+import TimeExtra as Time
+import UserConfig exposing (Texts, Theme)
+
+
+radioGroup : Theme -> (a -> HtmlId) -> (a -> msg) -> Nonempty a -> Maybe a -> (a -> String) -> Maybe String -> Element msg
+radioGroup theme htmlId onSelect options selected optionToLabel maybeError =
+    let
+        optionsView =
+            List.Nonempty.map
+                (\\value ->
+                    Element.Input.button
+                        [ Element.width Element.fill
+                        , Element.paddingXY 0 6
+                        , htmlId value |> Dom.idToAttribute |> Element.htmlAttribute
+                        ]
+                        { onPress = Just (onSelect value)
+                        , label =
+                            Element.row
+                                []
+                                [ if Just value == selected then
+                                    checkboxChecked
+
+                                  else
+                                    checkboxEmpty
+                                , optionToLabel value
+                                    |> Element.text
+                                    |> List.singleton
+                                    |> Element.paragraph [ Element.paddingXY 8 0 ]
+                                ]
+                        }
+                )
+                options
+                |> List.Nonempty.toList
+    in
+    optionsView
+        ++ [ Maybe.map (error theme) maybeError |> Maybe.withDefault Element.none ]
+        |> Element.column []
+"""
+            """module A exposing (..)
+
+import Colors
+import Date exposing (Date)
+import Effect.Browser.Dom as Dom exposing (HtmlId)
+import Element exposing (Attr, Attribute, Element)
+import Element.Background
+import Element.Border
+import Element.Font
+import Element.Input
+import Element.Region
+import EmailAddress exposing (EmailAddress)
+import Html exposing (Html)
+import Html.Attributes
+import Html.Events
+import Json.Decode
+import List.Nonempty exposing (Nonempty)
+import Route exposing (Route)
+import Svg
+import Svg.Attributes
+import Time
+import Time.Extra as Time
+import TimeExtra as Time
+import UserConfig exposing (Texts, Theme)
+
+
+radioGroup : Theme -> (a -> HtmlId) -> (a -> msg) -> Nonempty a -> Maybe a -> (a -> String) -> Maybe String -> Element msg
+radioGroup theme htmlId onSelect options selected optionToLabel maybeError =
+    let
+        optionsView =
+            List.Nonempty.map
+                (\\value ->
+                    Element.Input.button
+                        [ Element.width Element.fill
+                        , Element.paddingXY 0 6
+                        , htmlId value |> Dom.idToAttribute |> Element.htmlAttribute
+                        ]
+                        { onPress = Just (onSelect value)
+                        , label =
+                            Element.row
+                                []
+                                [ if Just value == selected then
+                                    checkboxChecked
+
+                                  else
+                                    checkboxEmpty
+                                , optionToLabel value
+                                    |> Element.text
+                                    |> List.singleton
+                                    |> Element.paragraph [ Element.paddingXY 8 0 ]
+                                ]
+                        }
+                )
+                options
+                |> List.Nonempty.toList
+    in
+    optionsView
+        ++ [ Maybe.map (error theme) maybeError |> Maybe.withDefault Element.none ]
+        |> Element.column []
+"""
         ]
 
 

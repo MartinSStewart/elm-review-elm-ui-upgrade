@@ -694,6 +694,7 @@ addListItem text listRange list =
 
 writeExpression expr =
     Elm.Writer.write (Elm.Writer.writeExpression expr)
+        |> String.replace "\n" ("\n" ++ String.repeat 100 " ")
 
 
 handleAttributeList moduleName function listRange list =
@@ -755,6 +756,7 @@ expressionVisitor (Node range expr) =
         Application [ Node range2 (FunctionOrValue [ "Element" ] "link"), Node listRange (ListExpr list), Node recordRange (RecordExpr [ Node _ ( Node _ "label", label ), Node _ ( Node _ "url", url ) ]) ] ->
             [ Review.Fix.replaceRangeBy range2 "Ui.el"
             , addListItem ("Ui.link (" ++ writeExpression url ++ ")") listRange list
+            , Review.Fix.replaceRangeBy recordRange ("(" ++ writeExpression label ++ ")")
             ]
 
         --++ handleAttributeList [ "Element" ] "link" listRange list
