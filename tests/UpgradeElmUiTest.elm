@@ -291,6 +291,44 @@ a =
         , Ui.up 5
         ]
 """
+        , ruleTest "Fix attributes param being removed"
+            """module A exposing (..)
+
+import Element exposing (Element)
+
+a = 
+    MyUi.section
+        theme
+        texts.organizer
+        (Element.link
+            []
+            { url = Route.encode (Route.UserRoute (Group.ownerId group) owner.name)
+            , label =
+                Element.row
+                    [ Element.spacing 16 ]
+                    [ ProfileImage.smallImage userConfig owner.profileImage
+                    , Element.text (Name.toString owner.name)
+                    ]
+            }
+        )
+"""
+            """module A exposing (..)
+
+import Element exposing (Element)
+
+a = 
+    MyUi.section
+        theme
+        texts.organizer
+        (Ui.el
+            [ Ui.width Ui.shrink Ui.link (Route.encode (Route.UserRoute (Group.ownerId group) owner.name)) ]
+            (Ui.row [ Uith Ui.shrink, Ui.spacing 16 ]
+                [ ProfileImage.smallImage userConfig owner.profileImage
+                , Ui.text (Name.toString owner.name)
+                ]
+            )
+        )
+"""
         ]
 
 

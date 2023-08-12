@@ -755,32 +755,32 @@ expressionVisitor (Node range expr) =
         Application [ Node range2 (FunctionOrValue [ "Element" ] "link"), Node listRange (ListExpr list), Node recordRange (RecordExpr [ Node _ ( Node _ "label", label ), Node _ ( Node _ "url", url ) ]) ] ->
             [ Review.Fix.replaceRangeBy range2 "Ui.el"
             , addListItem ("Ui.link (" ++ writeExpression url ++ ")") listRange list
-            , Review.Fix.replaceRangeBy recordRange ("(" ++ writeExpression label ++ ")")
             ]
-                ++ handleAttributeList [ "Element" ] "link" listRange list
 
+        --++ handleAttributeList [ "Element" ] "link" listRange list
         Application [ Node range2 (FunctionOrValue [ "Element" ] "newTabLink"), Node listRange (ListExpr list), Node recordRange (RecordExpr [ Node _ ( Node _ "label", label ), Node _ ( Node _ "url", url ) ]) ] ->
             [ Review.Fix.replaceRangeBy range2 "Ui.el"
             , addListItem ("Ui.newTabLink (" ++ writeExpression url ++ ")") listRange list
             , Review.Fix.replaceRangeBy recordRange ("(" ++ writeExpression label ++ ")")
             ]
-                ++ handleAttributeList [ "Element" ] "newTabLink" listRange list
 
+        --++ handleAttributeList [ "Element" ] "newTabLink" listRange list
         Application [ Node range2 (FunctionOrValue [ "Element" ] "download"), Node listRange (ListExpr list), Node recordRange (RecordExpr [ Node _ ( Node _ "label", label ), Node _ ( Node _ "url", url ) ]) ] ->
             [ Review.Fix.replaceRangeBy range2 "Ui.el"
             , addListItem ("Ui.download (" ++ writeExpression url ++ ")") listRange list
             , Review.Fix.replaceRangeBy recordRange ("(" ++ writeExpression label ++ ")")
             ]
-                ++ handleAttributeList [ "Element" ] "download" listRange list
 
+        ---++ handleAttributeList [ "Element" ] "download" listRange list
         Application [ Node range2 (FunctionOrValue [ "Element", "Input" ] "button"), Node listRange (ListExpr list), Node recordRange (RecordExpr [ Node _ ( Node _ "label", label ), Node _ ( Node _ "onPress", onPress ) ]) ] ->
             let
                 fixButton msg =
                     [ Review.Fix.replaceRangeBy range2 "Ui.el"
-                    , addListItem ("Ui.onPres (" ++ writeExpression msg ++ ")") listRange list
+                    , addListItem ("Ui.Events.onClick (" ++ writeExpression msg ++ ")") listRange list
                     , Review.Fix.replaceRangeBy recordRange ("(" ++ writeExpression label ++ ")")
                     ]
-                        ++ handleAttributeList [ "Element", "Input" ] "button" listRange list
+
+                --++ handleAttributeList [ "Element", "Input" ] "button" listRange list
             in
             case removeParens onPress |> Node.value of
                 Application [ Node _ (FunctionOrValue _ "Just"), msg ] ->
