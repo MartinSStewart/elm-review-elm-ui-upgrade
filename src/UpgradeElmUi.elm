@@ -411,15 +411,52 @@ handleApplication elmJsonKey application context =
 
 
 importVisitor : Node Import -> List Fix
-importVisitor (Node _ import2) =
-    renameModules2 import2.moduleName
-        ++ (case import2.moduleAlias of
-                Just alias ->
-                    renameModules2 alias
+importVisitor (Node range import2) =
+    let
+        fix text =
+            [ Review.Fix.replaceRangeBy (Node.range import2.moduleName) text ]
+    in
+    case Node.value import2.moduleName of
+        [ "Element", "Background" ] ->
+            [ Review.Fix.removeRange range ]
 
-                Nothing ->
-                    []
-           )
+        [ "Element", "Border" ] ->
+            [ Review.Fix.removeRange range ]
+
+        [ "Element" ] ->
+            fix "Ui"
+
+        [ "Element", "Events" ] ->
+            fix "Ui.Events"
+
+        [ "Element", "Font" ] ->
+            fix "Ui.Font"
+
+        [ "Element", "Input" ] ->
+            fix "Ui.Input"
+
+        [ "Element", "Keyed" ] ->
+            fix "Ui.Keyed"
+
+        [ "Element", "Lazy" ] ->
+            fix "Ui.Lazy"
+
+        [ "Element", "Region" ] ->
+            fix "Ui.Accessibility"
+
+        _ ->
+            []
+
+
+
+--renameModules2 import2.moduleName
+--    ++ (case import2.moduleAlias of
+--            Just alias ->
+--                renameModules2 alias
+--
+--            Nothing ->
+--                []
+--       )
 
 
 moduleDefinitionVisitor : Node Module -> Context -> ( List (Rule.Error {}), Context )
@@ -493,7 +530,7 @@ patternVisitor (Node range pattern) =
             []
 
         NamedPattern { moduleName, name } nodes ->
-            renameModules2
+            renameFunctions
                 (Node
                     { start = range.start
                     , end =
@@ -501,7 +538,7 @@ patternVisitor (Node range pattern) =
                         , row = range.start.row
                         }
                     }
-                    moduleName
+                    ( moduleName, name )
                 )
                 ++ List.concatMap patternVisitor nodes
 
@@ -559,18 +596,8 @@ typeAnnotationVisitor (Node _ typeAnnotation) =
         GenericType _ ->
             []
 
-        Typed (Node range ( moduleName, name )) nodes ->
-            renameModules2
-                (Node
-                    { start = range.start
-                    , end =
-                        { column = range.end.column - String.length name - 1
-                        , row = range.start.row
-                        }
-                    }
-                    moduleName
-                )
-                ++ List.concatMap typeAnnotationVisitor nodes
+        Typed node nodes ->
+            renameFunctions node ++ List.concatMap typeAnnotationVisitor nodes
 
         Unit ->
             []
@@ -592,86 +619,70 @@ typeAnnotationVisitor (Node _ typeAnnotation) =
             typeAnnotationVisitor node1 ++ typeAnnotationVisitor node2
 
 
-renameModules2 : Node ModuleName -> List Fix
-renameModules2 (Node range moduleName) =
-    case moduleName of
-        --[ "Ui" ] ->
-        --    [ replaceModuleName range "MyUi" ]
-        [ "Element" ] ->
-            [ replaceModuleName range "Ui" ]
+renameFunctions : Node ( ModuleName, String ) -> List Fix
+renameFunctions (Node range ( moduleName, function )) =
+    let
+        fix : String -> List Fix
+        fix text =
+            [ Review.Fix.replaceRangeBy range text ]
+    in
+    case moduleName ++ [ function ] of
+        [ "Element", "Background", "color" ] ->
+            fix "Ui.background"
 
-        [ "Element", "Background" ] ->
-            [ replaceModuleName range "Ui.Background" ]
+        [ "Element", "Border", "color" ] ->
+            fix "Ui.borderColor"
 
-        [ "Element", "Border" ] ->
-            [ replaceModuleName range "Ui.Border" ]
+        [ "Element", "Border", "rounded" ] ->
+            fix "Ui.rounded"
 
-        [ "Element", "Events" ] ->
-            [ replaceModuleName range "Ui.Events" ]
+        [ "Element", "Border", "roundEach" ] ->
+            fix "Ui.roundedWith"
 
-        [ "Element", "Font" ] ->
-            [ replaceModuleName range "Ui.Font" ]
+        [ "Element", "Border", "width" ] ->
+            fix "Ui.border"
 
-        [ "Element", "Input" ] ->
-            [ replaceModuleName range "Ui.Input" ]
+        [ "Element", "Events", name ] ->
+            fix ("Ui.Events." ++ name)
 
-        [ "Element", "Keyed" ] ->
-            [ replaceModuleName range "Ui.Keyed" ]
+        [ "Element", "Font", name ] ->
+            fix ("Ui.Font" ++ name)
 
-        [ "Element", "Lazy" ] ->
-            [ replaceModuleName range "Ui.Lazy" ]
+        [ "Element", "Input", name ] ->
+            fix ("Ui.Input" ++ name)
 
-        [ "Element", "Region" ] ->
-            [ replaceModuleName range "Ui.Region" ]
+        [ "Element", "Keyed", name ] ->
+            fix ("Ui.Keyed" ++ name)
+
+        [ "Element", "Lazy", name ] ->
+            fix ("Ui.Lazy" ++ name)
+
+        [ "Element", "Region", name ] ->
+            fix ("Ui.Region" ++ name)
+
+        [ "Element", "moveLeft" ] ->
+            fix "Ui.left"
+
+        [ "Element", "moveRight" ] ->
+            fix "Ui.right"
+
+        [ "Element", "moveUp" ] ->
+            fix "Ui.up"
+
+        [ "Element", "moveDown" ] ->
+            fix "Ui.down"
+
+        [ "Element", "table" ] ->
+            fix "Ui.Table.column"
+
+        [ "Element", "indexedTable" ] ->
+            fix "Ui.Table.indexedTable"
+
+        [ "Element", name ] ->
+            fix ("Ui." ++ name)
 
         _ ->
             []
-
-
-replaceModuleName : Range -> String -> Fix
-replaceModuleName range newModuleName =
-    Review.Fix.replaceRangeBy range newModuleName
-
-
-renameModules3 : Range -> ModuleName -> String -> List Fix
-renameModules3 range moduleName functionName =
-    renameModules2
-        (Node
-            { start = range.start
-            , end =
-                { column = range.end.column - String.length functionName - 1
-                , row = range.start.row
-                }
-            }
-            moduleName
-        )
-        ++ (let
-                start =
-                    { column = range.end.column - String.length functionName
-                    , row = range.start.row
-                    }
-
-                functionRange =
-                    { start = start
-                    , end = { column = range.end.column, row = range.start.row }
-                    }
-            in
-            case moduleName ++ [ functionName ] of
-                [ "Element", "moveLeft" ] ->
-                    [ Review.Fix.replaceRangeBy functionRange "left" ]
-
-                [ "Element", "moveRight" ] ->
-                    [ Review.Fix.replaceRangeBy functionRange "right" ]
-
-                [ "Element", "moveUp" ] ->
-                    [ Review.Fix.replaceRangeBy functionRange "up" ]
-
-                [ "Element", "moveDown" ] ->
-                    [ Review.Fix.replaceRangeBy functionRange "down" ]
-
-                _ ->
-                    []
-           )
 
 
 addListItem : String -> Range -> List a -> Fix
@@ -751,7 +762,7 @@ expressionVisitor : Node Expression -> List Fix
 expressionVisitor (Node range expr) =
     case expr of
         FunctionOrValue moduleName function ->
-            renameModules3 range moduleName function
+            renameFunctions (Node range ( moduleName, function ))
 
         Application [ Node range2 (FunctionOrValue [ "Element" ] "link"), Node listRange (ListExpr list), Node recordRange (RecordExpr [ Node _ ( Node _ "label", label ), Node _ ( Node _ "url", url ) ]) ] ->
             [ Review.Fix.replaceRangeBy range2 "Ui.el"
@@ -798,7 +809,7 @@ expressionVisitor (Node range expr) =
                     fixButton onPress
 
         Application ((Node range2 (FunctionOrValue moduleName function)) :: (Node listRange (ListExpr list)) :: rest) ->
-            renameModules3 range2 moduleName function
+            renameFunctions (Node range2 ( moduleName, function ))
                 ++ List.concatMap expressionVisitor rest
                 ++ handleAttributeList moduleName function listRange list
 
@@ -812,7 +823,7 @@ expressionVisitor (Node range expr) =
              else
                 []
             )
-                ++ renameModules3 range2 moduleName function
+                ++ renameFunctions (Node range2 ( moduleName, function ))
                 ++ List.concatMap expressionVisitor (second :: rest)
 
         Application list ->
