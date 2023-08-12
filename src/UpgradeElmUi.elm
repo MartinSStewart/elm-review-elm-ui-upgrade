@@ -21,6 +21,7 @@ import Elm.Syntax.Pattern exposing (Pattern(..))
 import Elm.Syntax.Range exposing (Location, Range)
 import Elm.Syntax.TypeAnnotation exposing (TypeAnnotation(..))
 import Elm.Version
+import Elm.Writer
 import List.Extra as List
 import Review.Fix exposing (Fix)
 import Review.ModuleNameLookupTable exposing (ModuleNameLookupTable)
@@ -673,63 +674,131 @@ renameModules3 range moduleName functionName =
            )
 
 
+addListItem : String -> Range -> List a -> Fix
+addListItem text listRange list =
+    let
+        insideListStart : Location
+        insideListStart =
+            { column = listRange.start.column + 1, row = listRange.start.row }
+    in
+    " "
+        ++ text
+        ++ (if List.isEmpty list then
+                ""
+
+            else
+                ","
+           )
+        |> Review.Fix.insertAt insideListStart
+
+
+writeExpression expr =
+    Elm.Writer.write (Elm.Writer.writeExpression expr)
+
+
+handleAttributeList moduleName function listRange list =
+    if isLayoutElement moduleName function then
+        if List.any isWidthAttribute list then
+            List.foldl
+                (\item { endOfPrevious, fixes, isFirst } ->
+                    { fixes =
+                        if isWidthFill item then
+                            Review.Fix.removeRange
+                                { start = endOfPrevious
+                                , end =
+                                    case ( isFirst, List.getAt 1 list ) of
+                                        ( True, Just (Node rangeNext _) ) ->
+                                            rangeNext.start
+
+                                        _ ->
+                                            Node.range item |> .end
+                                }
+                                :: fixes
+
+                        else
+                            expressionVisitor item ++ fixes
+                    , endOfPrevious = Node.range item |> .end
+                    , isFirst = False
+                    }
+                )
+                { endOfPrevious = { column = listRange.start.column + 1, row = listRange.start.row }
+                , fixes = []
+                , isFirst = True
+                }
+                list
+                |> .fixes
+
+        else
+            addListItem "Ui.width Ui.shrink" listRange list
+                :: List.concatMap expressionVisitor list
+
+    else
+        List.concatMap expressionVisitor list
+
+
+removeParens : Node Expression -> Node Expression
+removeParens expr =
+    case Node.value expr of
+        ParenthesizedExpression node ->
+            removeParens node
+
+        _ ->
+            expr
+
+
 expressionVisitor : Node Expression -> List Fix
 expressionVisitor (Node range expr) =
     case expr of
         FunctionOrValue moduleName function ->
             renameModules3 range moduleName function
 
-        Application ((Node range2 (FunctionOrValue moduleName function)) :: (Node param1Range (ListExpr list)) :: rest) ->
+        Application [ Node range2 (FunctionOrValue [ "Element" ] "link"), Node listRange (ListExpr list), Node recordRange (RecordExpr [ Node _ ( Node _ "label", label ), Node _ ( Node _ "url", url ) ]) ] ->
+            [ Review.Fix.replaceRangeBy range2 "Ui.el"
+            , addListItem ("Ui.link (" ++ writeExpression url ++ ")") listRange list
+            , Review.Fix.replaceRangeBy recordRange ("(" ++ writeExpression label ++ ")")
+            ]
+                ++ handleAttributeList [ "Element" ] "link" listRange list
+
+        Application [ Node range2 (FunctionOrValue [ "Element" ] "newTabLink"), Node listRange (ListExpr list), Node recordRange (RecordExpr [ Node _ ( Node _ "label", label ), Node _ ( Node _ "url", url ) ]) ] ->
+            [ Review.Fix.replaceRangeBy range2 "Ui.el"
+            , addListItem ("Ui.newTabLink (" ++ writeExpression url ++ ")") listRange list
+            , Review.Fix.replaceRangeBy recordRange ("(" ++ writeExpression label ++ ")")
+            ]
+                ++ handleAttributeList [ "Element" ] "newTabLink" listRange list
+
+        Application [ Node range2 (FunctionOrValue [ "Element" ] "download"), Node listRange (ListExpr list), Node recordRange (RecordExpr [ Node _ ( Node _ "label", label ), Node _ ( Node _ "url", url ) ]) ] ->
+            [ Review.Fix.replaceRangeBy range2 "Ui.el"
+            , addListItem ("Ui.download (" ++ writeExpression url ++ ")") listRange list
+            , Review.Fix.replaceRangeBy recordRange ("(" ++ writeExpression label ++ ")")
+            ]
+                ++ handleAttributeList [ "Element" ] "download" listRange list
+
+        Application [ Node range2 (FunctionOrValue [ "Element", "Input" ] "button"), Node listRange (ListExpr list), Node recordRange (RecordExpr [ Node _ ( Node _ "label", label ), Node _ ( Node _ "onPress", onPress ) ]) ] ->
+            let
+                fixButton msg =
+                    [ Review.Fix.replaceRangeBy range2 "Ui.el"
+                    , addListItem ("Ui.onPres (" ++ writeExpression msg ++ ")") listRange list
+                    , Review.Fix.replaceRangeBy recordRange ("(" ++ writeExpression label ++ ")")
+                    ]
+                        ++ handleAttributeList [ "Element", "Input" ] "button" listRange list
+            in
+            case removeParens onPress |> Node.value of
+                Application [ Node _ (FunctionOrValue _ "Just"), msg ] ->
+                    fixButton msg
+
+                OperatorApplication "<|" _ (Node _ (FunctionOrValue _ "Just")) msg ->
+                    fixButton msg
+
+                OperatorApplication "|>" _ msg (Node _ (FunctionOrValue _ "Just")) ->
+                    fixButton msg
+
+                _ ->
+                    fixButton onPress
+
+        Application ((Node range2 (FunctionOrValue moduleName function)) :: (Node listRange (ListExpr list)) :: rest) ->
             renameModules3 range2 moduleName function
                 ++ List.concatMap expressionVisitor rest
-                ++ (if isLayoutElement moduleName function then
-                        let
-                            insideListStart : Location
-                            insideListStart =
-                                { column = param1Range.start.column + 1, row = param1Range.start.row }
-                        in
-                        if List.any isWidthAttribute list then
-                            List.foldl
-                                (\item { endOfPrevious, fixes, isFirst } ->
-                                    { fixes =
-                                        if isWidthFill item then
-                                            Review.Fix.removeRange
-                                                { start = endOfPrevious
-                                                , end =
-                                                    case ( isFirst, List.getAt 1 list ) of
-                                                        ( True, Just (Node rangeNext _) ) ->
-                                                            rangeNext.start
-
-                                                        _ ->
-                                                            Node.range item |> .end
-                                                }
-                                                :: fixes
-
-                                        else
-                                            expressionVisitor item ++ fixes
-                                    , endOfPrevious = Node.range item |> .end
-                                    , isFirst = False
-                                    }
-                                )
-                                { endOfPrevious = insideListStart, fixes = [], isFirst = True }
-                                list
-                                |> .fixes
-
-                        else
-                            (" Ui.width Ui.shrink"
-                                ++ (if List.isEmpty list then
-                                        ""
-
-                                    else
-                                        ","
-                                   )
-                                |> Review.Fix.insertAt insideListStart
-                            )
-                                :: List.concatMap expressionVisitor list
-
-                    else
-                        List.concatMap expressionVisitor list
-                   )
+                ++ handleAttributeList moduleName function listRange list
 
         Application ((Node range2 (FunctionOrValue moduleName function)) :: second :: rest) ->
             (if isLayoutElement moduleName function then
@@ -870,6 +939,7 @@ hasAttributeListParam =
         , ( [ "Element" ], "row" )
         , ( [ "Element" ], "column" )
         , ( [ "Element" ], "table" )
+        , ( [ "Element" ], "indexedTable" )
         , ( [ "Element" ], "paragraph" )
         , ( [ "Element" ], "wrappedRow" )
         , ( [ "Element" ], "textColumn" )
@@ -877,4 +947,24 @@ hasAttributeListParam =
         , ( [ "Element" ], "image" )
         , ( [ "Element" ], "newTabLink" )
         , ( [ "Element" ], "link" )
+        , ( [ "Element" ], "download" )
+        , ( [ "Element" ], "downloadAs" )
+        , ( [ "Element", "Input" ], "button" )
+        , ( [ "Element", "Input" ], "text" )
+        , ( [ "Element", "Input" ], "checkbox" )
+        , ( [ "Element", "Input" ], "multiline" )
+        , ( [ "Element", "Input" ], "placeholder" )
+        , ( [ "Element", "Input" ], "username" )
+        , ( [ "Element", "Input" ], "newPassword" )
+        , ( [ "Element", "Input" ], "currentPassword" )
+        , ( [ "Element", "Input" ], "email" )
+        , ( [ "Element", "Input" ], "search" )
+        , ( [ "Element", "Input" ], "spellChecked" )
+        , ( [ "Element", "Input" ], "slider" )
+        , ( [ "Element", "Input" ], "radio" )
+        , ( [ "Element", "Input" ], "radioRow" )
+        , ( [ "Element", "Input" ], "labelAbove" )
+        , ( [ "Element", "Input" ], "labelBelow" )
+        , ( [ "Element", "Input" ], "labelLeft" )
+        , ( [ "Element", "Input" ], "labelRight" )
         ]

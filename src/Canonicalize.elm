@@ -242,6 +242,7 @@ expression lookupTable (Node range expr) =
 
         RecordExpr nodes ->
             List.map (Node.map (Tuple.mapSecond (expression lookupTable))) nodes
+                |> List.sortBy (\(Node _ ( Node _ fieldName, _ )) -> fieldName)
                 |> RecordExpr
 
         ListExpr nodes ->
