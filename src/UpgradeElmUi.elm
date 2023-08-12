@@ -806,7 +806,7 @@ expressionVisitor (Node range expr) =
             (if isLayoutElement moduleName function then
                 [ Review.Fix.insertAt
                     range2.end
-                    "\n    {- Containers now width fill by default (instead of width shrink). I couldn't update that here so I recommend you review these attributes -}\n"
+                    "\n    -- Containers now width fill by default (instead of width shrink). I couldn't update that here so I recommend you review these attributes\n"
                 ]
 
              else
