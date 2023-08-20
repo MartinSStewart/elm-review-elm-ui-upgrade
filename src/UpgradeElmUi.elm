@@ -819,9 +819,8 @@ expressionVisitor (Node range expr) =
                 []
 
         Application ((Node range2 (FunctionOrValue [ "Element" ] "mouseOver")) :: rest) ->
-            [ Review.Fix.replaceRangeBy range2 "Ui.Anim.hovered (Ui.Anim.ms 0)"
-            ]
-                ++ fixMouseOverAttributes
+            Review.Fix.replaceRangeBy range2 "Ui.Anim.hovered (Ui.Anim.ms 0)"
+                :: fixMouseOverAttributes rest
 
         Application [ Node range2 (FunctionOrValue [ "Element", "Input" ] "button"), Node listRange (ListExpr list), Node recordRange (RecordExpr [ Node _ ( Node _ "label", label ), Node _ ( Node _ "onPress", onPress ) ]) ] ->
             let
@@ -956,7 +955,7 @@ fixMouseOverAttributes rest =
     case rest of
         [ Node _ (ListExpr list) ] ->
             List.concatMap
-                (\Node _ item ->
+                (\(Node _ item) ->
                     case item of
                         Application [ Node range3 (FunctionOrValue [ "Element", "Background" ] "color"), _ ] ->
                             [ Review.Fix.replaceRangeBy range3 "Ui.Anim.backgroundColor" ]
