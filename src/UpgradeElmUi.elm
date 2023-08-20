@@ -445,7 +445,7 @@ importVisitor (Node range import2) =
                                 )
                                 exposed
 
-                        Nothing ->
+                        _ ->
                             []
                    )
 
@@ -469,17 +469,6 @@ importVisitor (Node range import2) =
 
         _ ->
             []
-
-
-
---renameModules2 import2.moduleName
---    ++ (case import2.moduleAlias of
---            Just alias ->
---                renameModules2 alias
---
---            Nothing ->
---                []
---       )
 
 
 moduleDefinitionVisitor : Node Module -> Context -> ( List (Rule.Error {}), Context )
