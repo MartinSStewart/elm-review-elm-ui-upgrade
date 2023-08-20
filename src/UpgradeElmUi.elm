@@ -11,6 +11,7 @@ import Elm.Constraint
 import Elm.Package
 import Elm.Project exposing (ApplicationInfo, PackageInfo)
 import Elm.Syntax.Declaration exposing (Declaration(..))
+import Elm.Syntax.Exposing exposing (Exposing(..), TopLevelExpose(..))
 import Elm.Syntax.Expression exposing (Expression(..), Function, LetDeclaration(..))
 import Elm.Syntax.File exposing (File)
 import Elm.Syntax.Import exposing (Import)
@@ -424,7 +425,29 @@ importVisitor (Node range import2) =
             [ Review.Fix.removeRange range ]
 
         [ "Element" ] ->
-            Review.Fix.insertAt range.end "\nimport Ui.Prose\nimport Ui.Layout\nimport Ui.Anim" :: fix "Ui"
+            Review.Fix.insertAt range.end "\nimport Ui.Prose\nimport Ui.Layout\nimport Ui.Anim"
+                :: fix "Ui"
+                ++ (case import2.exposingList of
+                        Just (Node _ (Explicit exposed)) ->
+                            List.filterMap
+                                (\(Node itemRange item) ->
+                                    case item of
+                                        TypeOrAliasExpose name ->
+                                            if name == "Attr" then
+                                                -- Replacing items from a list is easier than removing and elm-format will remove duplicate exposings
+                                                Review.Fix.replaceRangeBy itemRange "Attribute" |> Just
+
+                                            else
+                                                Nothing
+
+                                        _ ->
+                                            Nothing
+                                )
+                                exposed
+
+                        Nothing ->
+                            []
+                   )
 
         [ "Element", "Events" ] ->
             fix "Ui.Events"
@@ -591,13 +614,18 @@ topLevelDeclarationVisitor lookupTable declaration =
 
 
 typeAnnotationVisitor : Node TypeAnnotation -> List Fix
-typeAnnotationVisitor (Node _ typeAnnotation) =
+typeAnnotationVisitor (Node range typeAnnotation) =
     case typeAnnotation of
         GenericType _ ->
             []
 
         Typed node nodes ->
-            renameFunctions node ++ List.concatMap typeAnnotationVisitor nodes
+            case ( node, nodes ) of
+                ( Node _ ( [ "Element" ], "Attr" ), [ Node range2 _, _ ] ) ->
+                    [ Review.Fix.replaceRangeBy { range | end = range2.end } "Ui.Attribute" ]
+
+                _ ->
+                    renameFunctions node ++ List.concatMap typeAnnotationVisitor nodes
 
         Unit ->
             []
@@ -798,7 +826,7 @@ expressionVisitor (Node range expr) =
 
         Application [ Node range2 (FunctionOrValue [ "Element" ] "newTabLink"), Node listRange (ListExpr list), Node recordRange (RecordExpr [ Node _ ( Node _ "label", label ), Node _ ( Node _ "url", url ) ]) ] ->
             [ Review.Fix.replaceRangeBy range2 "Ui.el"
-            , addListItem ("Ui.newTabLink (" ++ writeExpression url ++ ")") listRange list
+            , addListItem ("Ui.linkNewTab (" ++ writeExpression url ++ ")") listRange list
             , Review.Fix.replaceRangeBy recordRange ("(" ++ writeExpression label ++ ")")
             ]
 
