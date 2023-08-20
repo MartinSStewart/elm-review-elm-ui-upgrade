@@ -724,6 +724,9 @@ renameFunctions (Node range ( moduleName, function )) =
             -- Don't rename this here as it requires looking at the parameter
             []
 
+        [ "Element", "rgb255" ] ->
+            fix "Ui.rgb"
+
         [ "Element", name ] ->
             fix ("Ui." ++ name)
 
@@ -841,6 +844,28 @@ expressionVisitor (Node range expr) =
         Application ((Node range2 (FunctionOrValue [ "Element" ] "mouseOver")) :: rest) ->
             Review.Fix.replaceRangeBy range2 "Ui.Anim.hovered (Ui.Anim.ms 0)"
                 :: fixMouseOverAttributes rest
+
+        Application [ Node _ (FunctionOrValue [ "Element" ] "rgb"), red, green, blue ] ->
+            let
+                handleColor color =
+                    case Node.value color of
+                        Floatable float ->
+                            float * 255 |> round |> String.fromInt
+
+                        Integer int ->
+                            int * 255 |> String.fromInt
+
+                        _ ->
+                            "(round (255 * (" ++ writeExpression color ++ ")))"
+            in
+            [ "Ui.rgb "
+                ++ handleColor red
+                ++ " "
+                ++ handleColor green
+                ++ " "
+                ++ handleColor blue
+                |> Review.Fix.replaceRangeBy range
+            ]
 
         Application [ Node range2 (FunctionOrValue [ "Element", "Input" ] "button"), Node listRange (ListExpr list), Node recordRange (RecordExpr [ Node _ ( Node _ "label", label ), Node _ ( Node _ "onPress", onPress ) ]) ] ->
             let
