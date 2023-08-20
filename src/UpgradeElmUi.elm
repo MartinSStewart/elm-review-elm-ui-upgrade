@@ -424,7 +424,7 @@ importVisitor (Node range import2) =
             [ Review.Fix.removeRange range ]
 
         [ "Element" ] ->
-            Review.Fix.insertAt range.end "\nimport Ui.Prose\nimport Ui.Layout\n" :: fix "Ui"
+            Review.Fix.insertAt range.end "\nimport Ui.Prose\nimport Ui.Layout\nimport Ui.Anim" :: fix "Ui"
 
         [ "Element", "Events" ] ->
             fix "Ui.Events"
@@ -664,7 +664,7 @@ renameFunctions (Node range ( moduleName, function )) =
             fix ("Ui.Lazy." ++ name)
 
         [ "Element", "Region", "heading" ] ->
-            -- Don't rename this as it requires looking at the parameter
+            -- Don't rename this here as it requires looking at the parameter
             []
 
         [ "Element", "Region", name ] ->
@@ -693,6 +693,16 @@ renameFunctions (Node range ( moduleName, function )) =
 
         [ "Element", "paragraph" ] ->
             fix "Ui.Prose.paragraph"
+
+        [ "Element", "paddingEach" ] ->
+            fix "Ui.paddingWith"
+
+        [ "Element", "alpha" ] ->
+            fix "Ui.opacity"
+
+        [ "Element", "mouseOver" ] ->
+            -- Don't rename this here as it requires looking at the parameter
+            []
 
         [ "Element", name ] ->
             fix ("Ui." ++ name)
@@ -801,12 +811,17 @@ expressionVisitor (Node range expr) =
         Application [ Node _ (FunctionOrValue [ "Element" ] "image"), _, Node _ (RecordExpr [ Node _ ( Node srcRange "src", _ ), _ ]) ] ->
             [ Review.Fix.replaceRangeBy srcRange "source" ]
 
-        Application [ Node range2 (FunctionOrValue [ "Element", "Region" ] "heading"), Node _ (Integer value) ] ->
+        Application [ Node _ (FunctionOrValue [ "Element", "Region" ] "heading"), Node _ (Integer value) ] ->
             if value > 0 && value < 7 then
-                [ Review.Fix.replaceRangeBy range2 ("Ui.Accessibility.h" ++ String.fromInt value) ]
+                [ Review.Fix.replaceRangeBy range ("Ui.Accessibility.h" ++ String.fromInt value) ]
 
             else
                 []
+
+        Application ((Node range2 (FunctionOrValue [ "Element" ] "mouseOver")) :: rest) ->
+            [ Review.Fix.replaceRangeBy range2 "Ui.Anim.hovered (Ui.Anim.ms 0)"
+            ]
+                ++ fixMouseOverAttributes
 
         Application [ Node range2 (FunctionOrValue [ "Element", "Input" ] "button"), Node listRange (ListExpr list), Node recordRange (RecordExpr [ Node _ ( Node _ "label", label ), Node _ ( Node _ "onPress", onPress ) ]) ] ->
             let
@@ -933,6 +948,34 @@ expressionVisitor (Node range expr) =
             List.concatMap (\(Node _ ( _, field )) -> expressionVisitor field) nodes
 
         GLSLExpression _ ->
+            []
+
+
+fixMouseOverAttributes : List (Node Expression) -> List Fix
+fixMouseOverAttributes rest =
+    case rest of
+        [ Node _ (ListExpr list) ] ->
+            List.concatMap
+                (\Node _ item ->
+                    case item of
+                        Application [ Node range3 (FunctionOrValue [ "Element", "Background" ] "color"), _ ] ->
+                            [ Review.Fix.replaceRangeBy range3 "Ui.Anim.backgroundColor" ]
+
+                        Application [ Node range3 (FunctionOrValue [ "Element", "Border" ] "color"), _ ] ->
+                            [ Review.Fix.replaceRangeBy range3 "Ui.Anim.borderColor" ]
+
+                        Application [ Node range3 (FunctionOrValue [ "Element", "Font" ] "color"), _ ] ->
+                            [ Review.Fix.replaceRangeBy range3 "Ui.Anim.fontColor" ]
+
+                        Application [ Node range3 (FunctionOrValue [ "Element" ] "alpha"), _ ] ->
+                            [ Review.Fix.replaceRangeBy range3 "Ui.Anim.opacity" ]
+
+                        _ ->
+                            []
+                )
+                list
+
+        _ ->
             []
 
 
