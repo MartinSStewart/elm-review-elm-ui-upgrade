@@ -424,7 +424,7 @@ importVisitor (Node range import2) =
             [ Review.Fix.removeRange range ]
 
         [ "Element" ] ->
-            fix "Ui"
+            Review.Fix.insertAt range.end "\nimport Ui.Prose\n" :: fix "Ui"
 
         [ "Element", "Events" ] ->
             fix "Ui.Events"
@@ -677,6 +677,9 @@ renameFunctions (Node range ( moduleName, function )) =
 
         [ "Element", "indexedTable" ] ->
             fix "Ui.Table.indexedTable"
+
+        [ "Element", "paragraph" ] ->
+            fix "Ui.Prose.paragraph"
 
         [ "Element", name ] ->
             fix ("Ui." ++ name)
