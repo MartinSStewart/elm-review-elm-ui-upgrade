@@ -683,10 +683,6 @@ renameFunctions (Node range ( moduleName, function )) =
         [ "Element", "Lazy", name ] ->
             fix ("Ui.Lazy." ++ name)
 
-        [ "Element", "Region", "heading" ] ->
-            -- Don't rename this here as it requires looking at the parameter
-            []
-
         [ "Element", "Region", name ] ->
             fix ("Ui.Accessibility." ++ name)
 
@@ -722,10 +718,6 @@ renameFunctions (Node range ( moduleName, function )) =
 
         [ "Element", "fillPortion" ] ->
             fix "Ui.portion"
-
-        [ "Element", "mouseOver" ] ->
-            -- Don't rename this here as it requires looking at the parameter
-            []
 
         [ "Element", "rgb255" ] ->
             fix "Ui.rgb"
@@ -834,8 +826,10 @@ expressionVisitor (Node range expr) =
             , Review.Fix.replaceRangeBy recordRange ("(" ++ writeExpression label ++ ")")
             ]
 
-        Application [ Node _ (FunctionOrValue [ "Element" ] "image"), _, Node _ (RecordExpr [ Node _ ( Node srcRange "src", _ ), _ ]) ] ->
-            [ Review.Fix.replaceRangeBy srcRange "source" ]
+        Application [ Node range2 (FunctionOrValue [ "Element" ] "image"), _, Node _ (RecordExpr [ Node _ ( Node srcRange "src", _ ), _ ]) ] ->
+            [ Review.Fix.replaceRangeBy range2 "Ui.image"
+            , Review.Fix.replaceRangeBy srcRange "source"
+            ]
 
         Application [ Node _ (FunctionOrValue [ "Element", "Region" ] "heading"), Node _ (Integer value) ] ->
             if value > 0 && value < 7 then

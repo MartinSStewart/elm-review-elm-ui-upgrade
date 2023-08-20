@@ -327,7 +327,7 @@ a = Ui.Input.labelHidden ""
 """
         , ruleTest "Remove Attr"
             """module A exposing (..)
-           
+
 import Element exposing (Attr, Element)
 import Element.Font
 
