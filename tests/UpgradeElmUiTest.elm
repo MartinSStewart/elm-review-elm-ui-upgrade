@@ -118,6 +118,9 @@ a =
             """module A exposing (..)
 
 import Ui
+import Ui.Prose
+import Ui.Layout
+import Ui.Anim
 
 a : Ui.Element
 a = 
@@ -139,6 +142,9 @@ a =
             """module A exposing (..)
 
 import Ui
+import Ui.Prose
+import Ui.Layout
+import Ui.Anim
 
 a : Ui.Element
 a =
@@ -171,6 +177,9 @@ view userConfig user =
 
 import Description
 import Ui exposing (Element)
+import Ui.Prose
+import Ui.Layout
+import Ui.Anim
 import FrontendUser exposing (FrontendUser)
 import Name
 import ProfileImage
@@ -224,6 +233,9 @@ d =
             """module A exposing (..)
 
 import Ui exposing (Element)
+import Ui.Prose
+import Ui.Layout
+import Ui.Anim
 
 a : Element msg
 a =
@@ -264,6 +276,9 @@ a =
             """module A exposing (..)
 
 import Ui exposing (Element)
+import Ui.Prose
+import Ui.Layout
+import Ui.Anim
 
 a = 
     Ui.image
@@ -284,6 +299,9 @@ a =
             """module A exposing (..)
 
 import Ui exposing (Element)
+import Ui.Prose
+import Ui.Layout
+import Ui.Anim
 
 a =
     Ui.image
@@ -293,16 +311,41 @@ a =
 """
         , ruleTest "Fix range error for nested module names"
             """module A exposing (..)
-       
+
 import Element exposing (Element)
-    
+
 a = Element.Input.labelHidden ""
 """
             """module A exposing (..)
-       
+
 import Ui exposing (Element)
-    
+import Ui.Prose
+import Ui.Layout
+import Ui.Anim
+
 a = Ui.Input.labelHidden ""
+"""
+        , ruleTest "Remove Attr"
+            """module A exposing (..)
+           
+import Element exposing (Attr, Element)
+import Element.Font
+
+a : Attr decorative msg
+a =
+    Element.Font.size 28
+"""
+            """module A exposing (..)
+
+import Ui exposing (Attribute, Element)
+import Ui.Prose
+import Ui.Layout
+import Ui.Anim
+import Ui.Font
+
+a : Attribute msg
+a =
+    Ui.Font.size 28
 """
         ]
 

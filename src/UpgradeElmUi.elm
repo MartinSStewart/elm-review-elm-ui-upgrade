@@ -613,6 +613,9 @@ typeAnnotationVisitor (Node range typeAnnotation) =
                 ( Node _ ( [ "Element" ], "Attr" ), [ Node range2 _, _ ] ) ->
                     [ Review.Fix.replaceRangeBy { range | end = range2.end } "Ui.Attribute" ]
 
+                ( Node _ ( [], "Attr" ), [ Node range2 _, _ ] ) ->
+                    [ Review.Fix.replaceRangeBy { range | end = range2.end } "Attribute" ]
+
                 _ ->
                     renameFunctions node ++ List.concatMap typeAnnotationVisitor nodes
 
