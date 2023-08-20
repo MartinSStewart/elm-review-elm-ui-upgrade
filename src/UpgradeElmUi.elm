@@ -720,6 +720,9 @@ renameFunctions (Node range ( moduleName, function )) =
         [ "Element", "alpha" ] ->
             fix "Ui.opacity"
 
+        [ "Element", "fillPortion" ] ->
+            fix "Ui.portion"
+
         [ "Element", "mouseOver" ] ->
             -- Don't rename this here as it requires looking at the parameter
             []
