@@ -663,11 +663,15 @@ renameFunctions (Node range ( moduleName, function )) =
         [ "Element", "Lazy", name ] ->
             fix ("Ui.Lazy." ++ name)
 
+        [ "Element", "Region", "heading" ] ->
+            -- Don't rename this as it requires looking at the parameter
+            []
+
         [ "Element", "Region", name ] ->
             fix ("Ui.Accessibility." ++ name)
 
         [ "Element", "wrappedRow" ] ->
-            fix "Ui.Layout.row { wrap = True, align = (Ui.Layout.Left, Ui.Layout.Top) }"
+            fix "Ui.Layout.row { wrap = True, align = (Ui.Layout.left, Ui.Layout.top) }"
 
         [ "Element", "moveLeft" ] ->
             fix "Ui.left"
@@ -796,6 +800,13 @@ expressionVisitor (Node range expr) =
 
         Application [ Node _ (FunctionOrValue [ "Element" ] "image"), _, Node _ (RecordExpr [ Node _ ( Node srcRange "src", _ ), _ ]) ] ->
             [ Review.Fix.replaceRangeBy srcRange "source" ]
+
+        Application [ Node range2 (FunctionOrValue [ "Element", "Region" ] "heading"), Node _ (Integer value) ] ->
+            if value > 0 && value < 7 then
+                [ Review.Fix.replaceRangeBy range2 ("Ui.Accessibility.h" ++ String.fromInt value) ]
+
+            else
+                []
 
         Application [ Node range2 (FunctionOrValue [ "Element", "Input" ] "button"), Node listRange (ListExpr list), Node recordRange (RecordExpr [ Node _ ( Node _ "label", label ), Node _ ( Node _ "onPress", onPress ) ]) ] ->
             let
