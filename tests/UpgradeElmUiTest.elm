@@ -291,6 +291,19 @@ a =
         , Ui.up 5
         ]
 """
+        , ruleTest "Fix range error for nested module names"
+            """module A exposing (..)
+       
+import Element exposing (Element)
+    
+a = Element.Input.labelHidden ""
+"""
+            """module A exposing (..)
+       
+import Ui exposing (Element)
+    
+a = Ui.Input.labelHidden ""
+"""
         ]
 
 

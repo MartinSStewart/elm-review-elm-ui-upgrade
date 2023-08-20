@@ -646,19 +646,19 @@ renameFunctions (Node range ( moduleName, function )) =
             fix ("Ui.Events." ++ name)
 
         [ "Element", "Font", name ] ->
-            fix ("Ui.Font" ++ name)
+            fix ("Ui.Font." ++ name)
 
         [ "Element", "Input", name ] ->
-            fix ("Ui.Input" ++ name)
+            fix ("Ui.Input." ++ name)
 
         [ "Element", "Keyed", name ] ->
-            fix ("Ui.Keyed" ++ name)
+            fix ("Ui.Keyed." ++ name)
 
         [ "Element", "Lazy", name ] ->
-            fix ("Ui.Lazy" ++ name)
+            fix ("Ui.Lazy." ++ name)
 
         [ "Element", "Region", name ] ->
-            fix ("Ui.Region" ++ name)
+            fix ("Ui.Region." ++ name)
 
         [ "Element", "moveLeft" ] ->
             fix "Ui.left"
