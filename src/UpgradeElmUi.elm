@@ -424,7 +424,7 @@ importVisitor (Node range import2) =
             [ Review.Fix.removeRange range ]
 
         [ "Element" ] ->
-            Review.Fix.insertAt range.end "\nimport Ui.Prose\n" :: fix "Ui"
+            Review.Fix.insertAt range.end "\nimport Ui.Prose\nimport Ui.Layout\n" :: fix "Ui"
 
         [ "Element", "Events" ] ->
             fix "Ui.Events"
@@ -433,7 +433,7 @@ importVisitor (Node range import2) =
             fix "Ui.Font"
 
         [ "Element", "Input" ] ->
-            fix "Ui.Input"
+            Review.Fix.insertAt range.end "\nimport Ui.Events\n" :: fix "Ui.Input"
 
         [ "Element", "Keyed" ] ->
             fix "Ui.Keyed"
@@ -642,6 +642,12 @@ renameFunctions (Node range ( moduleName, function )) =
         [ "Element", "Border", "width" ] ->
             fix "Ui.border"
 
+        [ "Element", "Border", "widthEach" ] ->
+            fix "Ui.borderWith"
+
+        [ "Element", "Border", "shadow" ] ->
+            fix "Ui.shadow"
+
         [ "Element", "Events", name ] ->
             fix ("Ui.Events." ++ name)
 
@@ -658,7 +664,10 @@ renameFunctions (Node range ( moduleName, function )) =
             fix ("Ui.Lazy." ++ name)
 
         [ "Element", "Region", name ] ->
-            fix ("Ui.Region." ++ name)
+            fix ("Ui.Accessibility." ++ name)
+
+        [ "Element", "wrappedRow" ] ->
+            fix "Ui.Layout.row { wrap = True, align = (Ui.Layout.Left, Ui.Layout.Top) }"
 
         [ "Element", "moveLeft" ] ->
             fix "Ui.left"
@@ -773,21 +782,21 @@ expressionVisitor (Node range expr) =
             , Review.Fix.replaceRangeBy recordRange ("(" ++ writeExpression label ++ ")")
             ]
 
-        --++ handleAttributeList [ "Element" ] "link" listRange list
         Application [ Node range2 (FunctionOrValue [ "Element" ] "newTabLink"), Node listRange (ListExpr list), Node recordRange (RecordExpr [ Node _ ( Node _ "label", label ), Node _ ( Node _ "url", url ) ]) ] ->
             [ Review.Fix.replaceRangeBy range2 "Ui.el"
             , addListItem ("Ui.newTabLink (" ++ writeExpression url ++ ")") listRange list
             , Review.Fix.replaceRangeBy recordRange ("(" ++ writeExpression label ++ ")")
             ]
 
-        --++ handleAttributeList [ "Element" ] "newTabLink" listRange list
         Application [ Node range2 (FunctionOrValue [ "Element" ] "download"), Node listRange (ListExpr list), Node recordRange (RecordExpr [ Node _ ( Node _ "label", label ), Node _ ( Node _ "url", url ) ]) ] ->
             [ Review.Fix.replaceRangeBy range2 "Ui.el"
             , addListItem ("Ui.download (" ++ writeExpression url ++ ")") listRange list
             , Review.Fix.replaceRangeBy recordRange ("(" ++ writeExpression label ++ ")")
             ]
 
-        ---++ handleAttributeList [ "Element" ] "download" listRange list
+        Application [ Node _ (FunctionOrValue [ "Element" ] "image"), _, Node _ (RecordExpr [ Node _ ( Node srcRange "src", _ ), _ ]) ] ->
+            [ Review.Fix.replaceRangeBy srcRange "source" ]
+
         Application [ Node range2 (FunctionOrValue [ "Element", "Input" ] "button"), Node listRange (ListExpr list), Node recordRange (RecordExpr [ Node _ ( Node _ "label", label ), Node _ ( Node _ "onPress", onPress ) ]) ] ->
             let
                 fixButton msg =
@@ -795,8 +804,6 @@ expressionVisitor (Node range expr) =
                     , addListItem ("Ui.Events.onClick (" ++ writeExpression msg ++ ")") listRange list
                     , Review.Fix.replaceRangeBy recordRange ("(" ++ writeExpression label ++ ")")
                     ]
-
-                --++ handleAttributeList [ "Element", "Input" ] "button" listRange list
             in
             case removeParens onPress |> Node.value of
                 Application [ Node _ (FunctionOrValue _ "Just"), msg ] ->
