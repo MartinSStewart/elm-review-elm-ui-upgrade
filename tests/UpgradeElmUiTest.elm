@@ -375,6 +375,26 @@ a =
 b =
     Ui.el [ Ui.Events.onClick (NoOp)] (Element.text "abc")
 """
+        , ruleTest "Handle type inside List"
+            """module A exposing (..)
+
+import Element exposing (Attribute, Element)
+
+
+column : List (Attribute msg)
+column =
+    []"""
+            """module A exposing (..)
+
+import Ui
+import Ui.Prose
+import Ui.Layout
+import Ui.Anim
+
+
+column : List (Ui.Attribute msg)
+column =
+    []"""
         ]
 
 

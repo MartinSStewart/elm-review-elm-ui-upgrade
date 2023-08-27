@@ -17,7 +17,7 @@ typeAnnotation lookupTable (Node range typeAnnotation2) =
 
         Typed (Node range2 ( moduleName, name )) nodes ->
             Typed
-                (Node range2 ( canonicalizeModuleName lookupTable moduleName range, name ))
+                (Node range2 ( canonicalizeModuleName lookupTable moduleName range2, name ))
                 (List.map (typeAnnotation lookupTable) nodes)
 
         Unit ->
