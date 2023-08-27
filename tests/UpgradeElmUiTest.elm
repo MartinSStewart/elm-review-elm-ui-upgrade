@@ -176,7 +176,7 @@ view userConfig user =
             """module A exposing (..)
 
 import Description
-import Ui exposing (Element)
+import Ui
 import Ui.Prose
 import Ui.Layout
 import Ui.Anim
@@ -186,7 +186,7 @@ import ProfileImage
 import MyUi
 import UserConfig exposing (UserConfig)
 
-view : UserConfig -> FrontendUser -> Element msg
+view : UserConfig -> FrontendUser -> Ui.Element msg
 view userConfig user =
     Ui.column
     -- Containers now width fill by default (instead of width shrink). I couldn't update that here so I recommend you review these attributes
@@ -232,31 +232,31 @@ d =
 """
             """module A exposing (..)
 
-import Ui exposing (Element)
+import Ui
 import Ui.Prose
 import Ui.Layout
 import Ui.Anim
 
-a : Element msg
+a : Ui.Element msg
 a =
     Ui.column
         [Ui.spacing 16 ]
         Ui.none
 
-b : Element msg
+b : Ui.Element msg
 b =
     Ui.column
         [ ]
         Ui.none
 
-c : Element msg
+c : Ui.Element msg
 c =
     Ui.column
         [
         ]
         Ui.none
 
-d : Element msg
+d : Ui.Element msg
 d =
     Ui.column
         [Ui.spacing 16
@@ -275,7 +275,7 @@ a =
 """
             """module A exposing (..)
 
-import Ui exposing (Element)
+import Ui
 import Ui.Prose
 import Ui.Layout
 import Ui.Anim
@@ -298,7 +298,7 @@ a =
 """
             """module A exposing (..)
 
-import Ui exposing (Element)
+import Ui
 import Ui.Prose
 import Ui.Layout
 import Ui.Anim
@@ -318,7 +318,7 @@ a = Element.Input.labelHidden ""
 """
             """module A exposing (..)
 
-import Ui exposing (Element)
+import Ui
 import Ui.Prose
 import Ui.Layout
 import Ui.Anim
@@ -337,15 +337,43 @@ a =
 """
             """module A exposing (..)
 
-import Ui exposing (Attribute, Element)
+import Ui
 import Ui.Prose
 import Ui.Layout
 import Ui.Anim
 import Ui.Font
 
-a : Attribute msg
+a : Ui.Attribute msg
 a =
     Ui.Font.size 28
+"""
+        , ruleTest "Handle unqualified functions"
+            """module A exposing (..)
+
+import Element exposing (paragraph)
+import Element.Input exposing (button)
+
+a =
+    paragraph [] []
+
+b =
+    button [] { onPress = Just NoOp, label = Element.text "abc" }
+"""
+            """module A exposing (..)
+
+import Ui
+import Ui.Prose
+import Ui.Layout
+import Ui.Anim
+import Ui.Input
+import Ui.Events
+
+
+a =
+    Ui.Prose.paragraph [ Ui.width Ui.shrink] []
+
+b =
+    Ui.el [ Ui.Events.onClick (NoOp)] (Element.text "abc")
 """
         ]
 

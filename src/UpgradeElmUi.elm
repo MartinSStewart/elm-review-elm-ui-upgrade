@@ -11,7 +11,6 @@ import Elm.Constraint
 import Elm.Package
 import Elm.Project exposing (ApplicationInfo, PackageInfo)
 import Elm.Syntax.Declaration exposing (Declaration(..))
-import Elm.Syntax.Exposing exposing (Exposing(..), TopLevelExpose(..))
 import Elm.Syntax.Expression exposing (Expression(..), Function, LetDeclaration(..))
 import Elm.Syntax.File exposing (File)
 import Elm.Syntax.Import exposing (Import)
@@ -415,7 +414,18 @@ importVisitor : Node Import -> List Fix
 importVisitor (Node range import2) =
     let
         fix text =
-            [ Review.Fix.replaceRangeBy (Node.range import2.moduleName) text ]
+            Review.Fix.replaceRangeBy (Node.range import2.moduleName) text
+                :: (case import2.exposingList of
+                        Just (Node exposingRange _) ->
+                            let
+                                start =
+                                    exposingRange.start
+                            in
+                            [ Review.Fix.removeRange { exposingRange | start = { start | column = start.column - 1 } } ]
+
+                        Nothing ->
+                            []
+                   )
     in
     case Node.value import2.moduleName of
         [ "Element", "Background" ] ->
@@ -427,27 +437,6 @@ importVisitor (Node range import2) =
         [ "Element" ] ->
             Review.Fix.insertAt range.end "\nimport Ui.Prose\nimport Ui.Layout\nimport Ui.Anim"
                 :: fix "Ui"
-                ++ (case import2.exposingList of
-                        Just (Node _ (Explicit exposed)) ->
-                            List.filterMap
-                                (\(Node itemRange item) ->
-                                    case item of
-                                        TypeOrAliasExpose name ->
-                                            if name == "Attr" then
-                                                -- Replacing items from a list is easier than removing and elm-format will remove duplicate exposings
-                                                Review.Fix.replaceRangeBy itemRange "Attribute" |> Just
-
-                                            else
-                                                Nothing
-
-                                        _ ->
-                                            Nothing
-                                )
-                                exposed
-
-                        _ ->
-                            []
-                   )
 
         [ "Element", "Events" ] ->
             fix "Ui.Events"

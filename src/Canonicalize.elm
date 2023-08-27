@@ -50,12 +50,8 @@ typeAnnotation lookupTable (Node range typeAnnotation2) =
 
 canonicalizeModuleName : ModuleNameLookupTable -> ModuleName -> Range -> List String
 canonicalizeModuleName lookupTable moduleName range =
-    if moduleName == [] then
-        []
-
-    else
-        Review.ModuleNameLookupTable.moduleNameAt lookupTable range
-            |> Maybe.withDefault moduleName
+    Review.ModuleNameLookupTable.moduleNameAt lookupTable range
+        |> Maybe.withDefault moduleName
 
 
 pattern : ModuleNameLookupTable -> Node Pattern -> Node Pattern
