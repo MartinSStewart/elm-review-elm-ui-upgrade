@@ -8,6 +8,6 @@ If you have an existing Ui.elm module, rename it to something else (`MyUi.elm` f
 
 After that, run the following command:
 ```bash
-npx npx elm-review --template MartinSStewart/elm-review-elm-ui-upgrade/preview --fix-all
+npx elm-review --template MartinSStewart/elm-review-elm-ui-upgrade/preview --fix-all
 ```
 *Don't remove the `--fix-all` flag. This rule needs to generate all fixes in a single pass in order for it to work.*
