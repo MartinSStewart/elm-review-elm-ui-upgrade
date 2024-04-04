@@ -104,7 +104,29 @@ elmJsonToConstructManually =
 all : Test
 all =
     describe "UpgradeElmUi"
-        [ ruleTest "Remove width fill"
+        [ ruleTest "Handle type signature in parentheses"
+            """module A exposing (..)
+
+import Element exposing (Attr)
+
+
+attrs : List (Attr a b)
+attrs =
+    []
+"""
+            """module A exposing (..)
+
+import Ui
+import Ui.Prose
+import Ui.Layout
+import Ui.Anim
+
+
+attrs : List (Ui.Attribute b)
+attrs =
+    []
+"""
+        , ruleTest "Remove width fill"
             """module A exposing (..)
 
 import Element

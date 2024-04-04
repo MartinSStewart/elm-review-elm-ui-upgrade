@@ -592,15 +592,15 @@ topLevelDeclarationVisitor lookupTable declaration =
 
 
 typeAnnotationVisitor : Node TypeAnnotation -> List Fix
-typeAnnotationVisitor (Node range typeAnnotation) =
+typeAnnotationVisitor (Node _ typeAnnotation) =
     case typeAnnotation of
         GenericType _ ->
             []
 
         Typed node nodes ->
             case ( node, nodes ) of
-                ( Node _ ( [ "Element" ], "Attr" ), [ Node range2 _, _ ] ) ->
-                    [ Review.Fix.replaceRangeBy { range | end = range2.end } "Ui.Attribute" ]
+                ( Node attrRange ( [ "Element" ], "Attr" ), [ Node range2 _, _ ] ) ->
+                    [ Review.Fix.replaceRangeBy { attrRange | end = range2.end } "Ui.Attribute" ]
 
                 _ ->
                     renameFunctions node ++ List.concatMap typeAnnotationVisitor nodes
