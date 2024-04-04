@@ -878,9 +878,13 @@ expressionVisitor (Node range expr) =
 
         Application ((Node range2 (FunctionOrValue moduleName function)) :: second :: rest) ->
             (if isLayoutElement moduleName function then
+                let
+                    leftPadding =
+                        String.repeat (range2.start.column - 1) " "
+                in
                 [ Review.Fix.insertAt
                     range2.end
-                    "\n    -- Containers now width fill by default (instead of width shrink). I couldn't update that here so I recommend you review these attributes\n"
+                    ("\n" ++ leftPadding ++ "-- Containers now width fill by default (instead of width shrink). I couldn't update that here so I recommend you review these attributes\n" ++ leftPadding)
                 ]
 
              else

@@ -104,7 +104,33 @@ elmJsonToConstructManually =
 all : Test
 all =
     describe "UpgradeElmUi"
-        [ ruleTest "Handle type signature in parentheses"
+        [ ruleTest "Handle line breaks in case of expressions"
+            """module A exposing (..)
+
+import Element
+
+
+foo =
+   case Nothing of
+       Nothing ->
+           Element.el a b
+"""
+            """module A exposing (..)
+
+import Ui
+import Ui.Prose
+import Ui.Layout
+import Ui.Anim
+
+
+foo =
+   case Nothing of
+       Nothing ->
+           Ui.el
+           -- Containers now width fill by default (instead of width shrink). I couldn't update that here so I recommend you review these attributes
+            a b
+"""
+        , ruleTest "Handle type signature in parentheses"
             """module A exposing (..)
 
 import Element exposing (Attr)
@@ -212,7 +238,7 @@ view : UserConfig -> FrontendUser -> Ui.Element msg
 view userConfig user =
     Ui.column
     -- Containers now width fill by default (instead of width shrink). I couldn't update that here so I recommend you review these attributes
-
+    
         (MyUi.pageContentAttributes ++ [ Ui.spacing 32 ])
         [ Ui.row
             [ Ui.width Ui.shrink, Ui.spacing 16 ]
